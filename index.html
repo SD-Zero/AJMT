@@ -13,6 +13,7 @@
       --accent: #ffe66d;
       --highlight: #4ecdc4;
       --text-main: #f5efff;
+      --danger: #ff4757;
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -61,6 +62,7 @@
       cursor: pointer;
       font-size: 0.9rem;
     }
+    .btn-danger { background: var(--danger); color: #fff; }
     .btn:disabled { background: #554466; color: #887799; cursor: not-allowed; }
     input[type="file"] { display: none; }
 
@@ -128,6 +130,45 @@
       background: #140824;
     }
     canvas { display: block; cursor: pointer; }
+
+    /* Note Inspector Modal GUI */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(10, 5, 20, 0.75);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-card {
+      background: var(--card-bg);
+      border: 2px solid var(--highlight);
+      border-radius: 12px;
+      padding: 20px 24px;
+      width: 320px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    .modal-title {
+      font-weight: 800;
+      font-size: 1.1rem;
+      color: var(--accent);
+      margin: 0;
+    }
+    .modal-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -146,7 +187,7 @@
   </div>
 
   <div class="control-group">
-    <label for="defaultOctave">Placement Octave:</label>
+    <label for="defaultOctave">Default Octave:</label>
     <input type="number" id="defaultOctave" value="4" min="0" max="7">
   </div>
 
@@ -158,11 +199,34 @@
 
 <div class="tracks-container" id="tracksContainer"></div>
 
+<div class="modal-overlay" id="inspectorModal">
+  <div class="modal-card">
+    <h3 class="modal-title" id="modalTitle">Edit Note</h3>
+    
+    <div class="modal-row">
+      <label for="editOctave">Octave (0-7):</label>
+      <input type="number" id="editOctave" min="0" max="7" value="4">
+    </div>
+
+    <div class="modal-row">
+      <label for="editDuration">Length (Blocks):</label>
+      <input type="number" id="editDuration" min="1" max="64" value="1">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="deleteNoteBtn">🗑 Delete</button>
+      <button class="btn" id="saveNoteBtn">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
   let parsedMidi = null;
   let processedLayers = [];
   let isSyncingScroll = false;
   let samplers = {};
+  let activeEditingNote = null;
+  let activeEditingLayer = null;
 
   const NOTE_CONFIG = [
     { name: 'B',  color: '#ff1493' },
@@ -184,7 +248,6 @@
     "Chirping Bells", "Gritty Brass", "Sunny Synth", "Harp", "Gentle Brass"
   ];
 
-  // Map instrument names to file prefixes
   const SAMPLE_PREFIXES = {
     "Grand Piano": "grandpiano",
     "Simple Piano": "simplepiano",
@@ -206,7 +269,6 @@
     return Math.floor((300 * bpm) / 15);
   }
 
-  // Initialize Audio Samplers from uploaded samples folder
   function getSampler(instrumentName) {
     const prefix = SAMPLE_PREFIXES[instrumentName] || "grandpiano";
     if (!samplers[prefix]) {
@@ -225,7 +287,7 @@
   function playNoteSample(instrumentName, fullNote) {
     Tone.start();
     const sampler = getSampler(instrumentName);
-    if (sampler && sampler.loaded) {
+    if (sampler) {
       sampler.triggerAttackRelease(fullNote, "8n");
     }
   }
@@ -353,6 +415,7 @@
 
       select.addEventListener('change', (e) => {
         layer.instrument = e.target.value;
+        getSampler(layer.instrument);
       });
 
       labelGroup.appendChild(titleSpan);
@@ -391,7 +454,6 @@
       function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 1. Grid Background
         for (let col = 0; col < maxCols; col++) {
           for (let row = 0; row < 12; row++) {
             const isDark = (col + row) % 2 === 0;
@@ -400,8 +462,10 @@
           }
         }
 
-        // 2. Render Note Blocks with Octave Indicator Text
         layer.notes.forEach(b => {
+          b.x = b.startCol * COL_WIDTH;
+          b.w = b.colDuration * COL_WIDTH;
+
           ctx.fillStyle = b.color;
           ctx.fillRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
 
@@ -409,7 +473,6 @@
           ctx.lineWidth = 1;
           ctx.strokeRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
 
-          // Octave Label inside note block
           ctx.fillStyle = '#ffffff';
           ctx.font = 'bold 10px sans-serif';
           ctx.fillText(b.octave, b.x + 4, b.y + 12);
@@ -419,9 +482,6 @@
 
       draw();
 
-      // Double Click / Double Tap Detection
-      let clickTimeout = null;
-
       canvas.addEventListener('click', (e) => {
         const rect = canvas.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -430,59 +490,41 @@
         const col = Math.floor(clickX / COL_WIDTH);
         const rowIdx = Math.floor(clickY / ROW_HEIGHT);
 
-        const existingIdx = layer.notes.findIndex(n => 
+        const existingNote = layer.notes.find(n => 
           n.rowIdx === rowIdx && col >= n.startCol && col < (n.startCol + n.colDuration)
         );
 
-        if (clickTimeout === null) {
-          // First Click / Tap
-          clickTimeout = setTimeout(() => {
-            clickTimeout = null;
-
-            if (existingIdx !== -1) {
-              // Edit Octave of Existing Note
-              const note = layer.notes[existingIdx];
-              const newOct = prompt(`Edit Octave for ${note.pitch} (0-7):`, note.octave);
-              if (newOct !== null && !isNaN(newOct)) {
-                const octNum = Math.max(0, Math.min(7, parseInt(newOct)));
-                note.octave = octNum;
-                note.fullNote = `${note.pitch}${octNum}`;
-                playNoteSample(layer.instrument, note.fullNote);
-                draw();
-              }
-            } else {
-              // Add New Note
-              const placementOctave = parseInt(document.getElementById('defaultOctave').value) || 4;
-              const pitchName = NOTE_CONFIG[rowIdx].name;
-              const fullNote = `${pitchName}${placementOctave}`;
-
-              layer.notes.push({
-                pitch: pitchName,
-                octave: placementOctave,
-                fullNote: fullNote,
-                startCol: col,
-                colDuration: 1,
-                rowIdx: rowIdx,
-                x: col * COL_WIDTH,
-                y: rowIdx * ROW_HEIGHT,
-                w: COL_WIDTH,
-                h: ROW_HEIGHT,
-                color: NOTE_CONFIG[rowIdx].color
-              });
-
-              playNoteSample(layer.instrument, fullNote);
-              draw();
-            }
-          }, 250);
+        if (existingNote) {
+          // Open Inspector Modal GUI
+          activeEditingNote = existingNote;
+          activeEditingLayer = layer;
+          document.getElementById('modalTitle').innerText = `Edit Note: ${existingNote.pitch}`;
+          document.getElementById('editOctave').value = existingNote.octave;
+          document.getElementById('editDuration').value = existingNote.colDuration;
+          document.getElementById('inspectorModal').style.display = 'flex';
         } else {
-          // Double Click / Tap -> Delete Note
-          clearTimeout(clickTimeout);
-          clickTimeout = null;
+          // Add Note on Empty Space
+          const placementOctave = parseInt(document.getElementById('defaultOctave').value) || 4;
+          const pitchName = NOTE_CONFIG[rowIdx].name;
+          const fullNote = `${pitchName}${placementOctave}`;
 
-          if (existingIdx !== -1) {
-            layer.notes.splice(existingIdx, 1);
-            draw();
-          }
+          const newNote = {
+            pitch: pitchName,
+            octave: placementOctave,
+            fullNote: fullNote,
+            startCol: col,
+            colDuration: 1,
+            rowIdx: rowIdx,
+            x: col * COL_WIDTH,
+            y: rowIdx * ROW_HEIGHT,
+            w: COL_WIDTH,
+            h: ROW_HEIGHT,
+            color: NOTE_CONFIG[rowIdx].color
+          };
+
+          layer.notes.push(newNote);
+          playNoteSample(layer.instrument, fullNote);
+          draw();
         }
       });
 
@@ -492,7 +534,6 @@
       container.appendChild(card);
     });
 
-    // Synchronize Horizontal Scrolling
     scrollContainers.forEach(targetContainer => {
       targetContainer.addEventListener('scroll', () => {
         if (!isSyncingScroll) {
@@ -507,15 +548,57 @@
     });
   }
 
-  // Audio Playback
+  // Modal Handlers
+  document.getElementById('saveNoteBtn').addEventListener('click', () => {
+    if (activeEditingNote) {
+      const newOct = parseInt(document.getElementById('editOctave').value) || 4;
+      const newDur = Math.max(1, parseInt(document.getElementById('editDuration').value) || 1);
+
+      activeEditingNote.octave = Math.max(0, Math.min(7, newOct));
+      activeEditingNote.colDuration = newDur;
+      activeEditingNote.fullNote = `${activeEditingNote.pitch}${activeEditingNote.octave}`;
+
+      playNoteSample(activeEditingLayer.instrument, activeEditingNote.fullNote);
+      renderStackedGrids(getMaxColumns());
+    }
+    document.getElementById('inspectorModal').style.display = 'none';
+  });
+
+  document.getElementById('deleteNoteBtn').addEventListener('click', () => {
+    if (activeEditingNote && activeEditingLayer) {
+      const idx = activeEditingLayer.notes.indexOf(activeEditingNote);
+      if (idx !== -1) {
+        activeEditingLayer.notes.splice(idx, 1);
+        renderStackedGrids(getMaxColumns());
+      }
+    }
+    document.getElementById('inspectorModal').style.display = 'none';
+  });
+
+  // Audio Playback Handler
   document.getElementById('playBtn').addEventListener('click', async () => {
+    const playBtn = document.getElementById('playBtn');
+    playBtn.disabled = true;
+    playBtn.innerText = "⏳ Loading Audio...";
+
     await Tone.start();
+    
+    // Ensure all samplers are created
+    processedLayers.forEach(l => getSampler(l.instrument));
+
+    // Wait for Tone to load sample files
+    await Tone.loaded();
+
+    Tone.Transport.stop();
     Tone.Transport.cancel();
+    Tone.Transport.position = 0;
+
+    const bpm = parseInt(document.getElementById('tempoInput').value) || 175;
+    Tone.Transport.bpm.value = bpm;
+    const secPerCol = 15 / bpm;
 
     processedLayers.forEach(layer => {
       const sampler = getSampler(layer.instrument);
-      const bpm = parseInt(document.getElementById('tempoInput').value) || 175;
-      const secPerCol = 15 / bpm;
 
       layer.notes.forEach(note => {
         const time = note.startCol * secPerCol;
@@ -527,9 +610,12 @@
     });
 
     Tone.Transport.start();
+    playBtn.innerText = "▶ Preview Audio";
+    playBtn.disabled = false;
   });
 
   renderStackedGrids(getMaxColumns());
 </script>
+
 </body>
 </html>
