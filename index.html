@@ -3,44 +3,46 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Animal Jam Mastertrack Converter & Grid</title>
+  <title>Animal Jam Mastertrack Converter</title>
   <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <style>
     :root {
-      --bg-color: #1a0f2b;
-      --card-bg: #2d1945;
+      --bg-color: #26163b;
+      --card-bg: #372152;
       --accent: #ffe66d;
       --highlight: #4ecdc4;
+      --text-main: #f5efff;
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background-color: var(--bg-color);
-      color: #ffffff;
+      color: var(--text-main);
       margin: 0;
-      padding: 15px;
+      padding: 20px;
       display: flex;
       flex-direction: column;
       align-items: center;
     }
     .controls-card {
       background: var(--card-bg);
-      padding: 15px 25px;
-      border-radius: 12px;
+      padding: 18px 24px;
+      border-radius: 14px;
       max-width: 950px;
       width: 100%;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
       margin-bottom: 15px;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
+      box-sizing: border-box;
     }
     h1 {
       color: var(--accent);
       margin: 0;
-      font-size: 1.4rem;
+      font-size: 1.3rem;
       width: 100%;
     }
     .control-group {
@@ -50,75 +52,115 @@
     }
     label {
       font-size: 0.9rem;
-      color: #d0c2e0;
-      font-weight: bold;
+      color: #d8c7ed;
+      font-weight: 600;
     }
-    input[type="number"], select {
-      background: #1a0f2b;
+    input[type="number"] {
+      background: #1c0f2e;
       color: var(--accent);
-      border: 1px solid var(--accent);
+      border: 1px solid #5a388a;
       padding: 6px 10px;
       border-radius: 6px;
       font-weight: bold;
       font-size: 0.95rem;
+      width: 80px;
     }
     .btn {
       background: var(--highlight);
-      color: #121e1d;
+      color: #0f2422;
       border: none;
-      padding: 8px 16px;
-      font-weight: bold;
-      border-radius: 6px;
+      padding: 9px 18px;
+      font-weight: 700;
+      border-radius: 8px;
       cursor: pointer;
       font-size: 0.9rem;
+      transition: transform 0.1s ease;
     }
-    .btn:disabled { background: #555; color: #888; cursor: not-allowed; }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { background: #554466; color: #887799; cursor: not-allowed; }
     input[type="file"] { display: none; }
 
-    /* Inspector Bar */
-    .inspector-bar {
-      background: #11081f;
-      border: 1px solid var(--accent);
-      border-radius: 8px;
-      padding: 10px 15px;
+    /* Redesigned Clean Info Bar */
+    .inspector-card {
+      background: #321c4a;
+      border: 1px solid #5d388c;
+      border-radius: 10px;
+      padding: 12px 20px;
       width: 100%;
       max-width: 950px;
-      font-family: monospace;
-      color: var(--accent);
-      margin-bottom: 15px;
+      color: var(--text-main);
+      margin-bottom: 20px;
       box-sizing: border-box;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .inspector-badge {
+      background: var(--accent);
+      color: #26163b;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-weight: 800;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      white-space: nowrap;
     }
 
-    /* Grid Layout Container */
-    .grid-wrapper {
+    /* Container for Stacked Tracks */
+    .tracks-container {
       display: flex;
+      flex-direction: column;
+      gap: 20px;
       width: 100%;
       max-width: 950px;
-      background: #11081f;
+    }
+
+    /* Individual Stacked Layer Card */
+    .track-card {
+      background: #201133;
       border: 2px solid #4a2d6d;
       border-radius: 10px;
       overflow: hidden;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+    }
+    .track-header {
+      background: #372152;
+      padding: 8px 15px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--accent);
+      border-bottom: 1px solid #4a2d6d;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .grid-wrapper {
+      display: flex;
+      width: 100%;
     }
     
     /* Y-Axis Pitch Labels */
     .pitch-labels {
       display: flex;
       flex-direction: column;
-      width: 55px;
-      background: #25133b;
+      width: 50px;
+      background: #2b1742;
       border-right: 2px solid #4a2d6d;
+      flex-shrink: 0;
     }
     .pitch-label {
-      height: 24px;
+      height: 16px; /* Matching ROW_HEIGHT */
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: bold;
-      font-size: 0.75rem;
-      border-bottom: 1px solid #371b58;
+      font-weight: 800;
+      font-size: 0.7rem;
+      border-bottom: 1px solid rgba(0,0,0,0.15);
       color: #ffffff;
-      text-shadow: 1px 1px 2px #000;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+      box-sizing: border-box;
     }
 
     /* Scrollable Canvas Area */
@@ -137,7 +179,7 @@
 <body>
 
 <div class="controls-card">
-  <h1>Animal Jam Mastertrack Note Grid</h1>
+  <h1>Animal Jam Mastertrack Converter</h1>
   
   <div class="control-group">
     <button class="btn" onclick="document.getElementById('midiInput').click()">📁 Load MIDI</button>
@@ -150,42 +192,23 @@
   </div>
 
   <div class="control-group">
-    <label for="octaveSelect">Octave:</label>
-    <select id="octaveSelect">
-      <option value="0">Octave 0</option>
-      <option value="1">Octave 1</option>
-      <option value="2">Octave 2</option>
-      <option value="3">Octave 3</option>
-      <option value="4" selected>Octave 4</option>
-      <option value="5">Octave 5</option>
-      <option value="6">Octave 6</option>
-      <option value="7">Octave 7</option>
-    </select>
-  </div>
-
-  <div class="control-group">
-    <button id="playBtn" class="btn" disabled>▶ Preview</button>
+    <button id="playBtn" class="btn" disabled>▶ Preview Audio</button>
   </div>
 </div>
 
-<div class="inspector-bar" id="inspector">
-  Status: Load a MIDI file to generate the Mastertracks grid...
+<div class="inspector-card" id="inspectorCard">
+  <span class="inspector-badge">Info</span>
+  <span id="inspectorText">Load a MIDI file to generate stacked layer tracks...</span>
 </div>
 
-<div class="grid-wrapper">
-  <div class="pitch-labels" id="pitchLabels"></div>
-  
-  <div class="canvas-container">
-    <canvas id="gridCanvas"></canvas>
-  </div>
-</div>
+<div class="tracks-container" id="tracksContainer"></div>
 
 <script>
   let parsedMidi = null;
   let synth = null;
-  let noteBlocks = [];
+  let processedLayers = [];
 
-  // AJ Chromatic Note Pitch Setup (Top to Bottom: B down to C)
+  // AJ Pitch Colors (B down to C)
   const NOTE_CONFIG = [
     { name: 'B',  color: '#ff1493' }, // Hot Pink
     { name: 'A#', color: '#8a2be2' }, // Purple
@@ -193,7 +216,7 @@
     { name: 'G#', color: '#0074d9' }, // Mid Blue
     { name: 'G',  color: '#00f3ff' }, // Light Neon Blue
     { name: 'F#', color: '#008080' }, // Teal
-    { name: 'F',  color: '#1022d9' }, // Neon Green
+    { name: 'F',  color: '#00ff00' }, // Neon Green
     { name: 'E',  color: '#32cd32' }, // Neon Lime Green
     { name: 'D#', color: '#ffd700' }, // Gold
     { name: 'D',  color: '#ff7f00' }, // Orange
@@ -201,36 +224,18 @@
     { name: 'C',  color: '#ff0000' }  // Bright Red
   ];
 
-  // Adjust display name for F row
-  NOTE_CONFIG[6].color = '#00ff00';
+  // Cell Dimensions (Wider horizontal rectangles)
+  const ROW_HEIGHT = 16; 
+  const COL_WIDTH = 28;  
 
-  const ROW_HEIGHT = 24;
-  const COL_WIDTH = 18;
-
-  // Render Left Side Pitch Labels
-  const labelsContainer = document.getElementById('pitchLabels');
-  NOTE_CONFIG.forEach(cfg => {
-    const div = document.createElement('div');
-    div.className = 'pitch-label';
-    div.style.backgroundColor = cfg.color;
-    div.innerText = cfg.name;
-    labelsContainer.appendChild(div);
-  });
-
-  // Calculate Max Columns for 5 Minutes at selected Tempo
   function getMaxColumns() {
     let bpm = parseInt(document.getElementById('tempoInput').value) || 175;
-    bpm = Math.max(65, Math.min(240, bpm)); // Clamp to 65 - 240
-    // 5 minutes = 300 seconds. Column duration = (15 / BPM) seconds
-    return Math.floor((300 * bpm) / 15);
+    bpm = Math.max(65, Math.min(240, bpm));
+    return Math.floor((300 * bpm) / 15); // 5 min cap
   }
 
   document.getElementById('tempoInput').addEventListener('change', () => {
-    if (parsedMidi) renderGrid();
-  });
-
-  document.getElementById('octaveSelect').addEventListener('change', () => {
-    if (parsedMidi) renderGrid();
+    if (parsedMidi) processAndRender();
   });
 
   document.getElementById('midiInput').addEventListener('change', async (e) => {
@@ -240,119 +245,165 @@
     const arrayBuffer = await file.arrayBuffer();
     parsedMidi = new Midi(arrayBuffer);
 
-    // Limit layers to AJ's 11 maximum
-    if (parsedMidi.tracks.length > 11) {
-      parsedMidi.tracks = parsedMidi.tracks.slice(0, 11);
-    }
-
-    renderGrid();
+    processAndRender();
     document.getElementById('playBtn').disabled = false;
   });
 
-  function renderGrid() {
+  function processAndRender() {
     if (!parsedMidi) return;
 
-    const canvas = document.getElementById('gridCanvas');
-    const ctx = canvas.getContext('2d');
-    
     const bpm = parseInt(document.getElementById('tempoInput').value) || 175;
-    const currentOctave = parseInt(document.getElementById('octaveSelect').value);
+    const secPerCol = 15 / bpm;
     const maxCols = getMaxColumns();
 
-    canvas.width = maxCols * COL_WIDTH;
-    canvas.height = 12 * ROW_HEIGHT;
+    processedLayers = [];
 
-    // 1. Draw Checkered Background
-    for (let col = 0; col < maxCols; col++) {
-      for (let row = 0; row < 12; row++) {
-        const isDark = (col + row) % 2 === 0;
-        ctx.fillStyle = isDark ? '#1a0e2e' : '#23133d';
-        ctx.fillRect(col * COL_WIDTH, row * ROW_HEIGHT, COL_WIDTH, ROW_HEIGHT);
+    // Helper: Find or create an available layer for an instrument
+    function addNoteToLayers(instrumentName, note) {
+      if (note.time > 300) return; // 5-minute limit cutoff
 
-        // Grid lines
-        ctx.strokeStyle = '#2d184d';
-        ctx.strokeRect(col * COL_WIDTH, row * ROW_HEIGHT, COL_WIDTH, ROW_HEIGHT);
+      const startCol = Math.floor(note.time / secPerCol);
+      const colDuration = Math.max(1, Math.round(note.duration / secPerCol));
+      if (startCol >= maxCols) return;
+
+      const pitchName = note.pitch;
+      const rowIdx = NOTE_CONFIG.findIndex(c => c.name === pitchName);
+      if (rowIdx === -1) return;
+
+      // Check existing layers matching this instrument for overlapping notes
+      let targetLayer = processedLayers.find(layer => {
+        if (layer.instrument !== instrumentName) return false;
+        // Verify no note already occupies this cell position
+        return !layer.notes.some(n => 
+          n.rowIdx === rowIdx && 
+          !(startCol + colDuration <= n.startCol || startCol >= n.startCol + n.colDuration)
+        );
+      });
+
+      // Create new layer if occupied or none exists (up to 11 layers max)
+      if (!targetLayer) {
+        if (processedLayers.length >= 11) return; // Enforce AJ 11 layer ceiling
+        targetLayer = {
+          id: processedLayers.length + 1,
+          instrument: instrumentName,
+          notes: []
+        };
+        processedLayers.push(targetLayer);
       }
+
+      targetLayer.notes.push({
+        pitch: pitchName,
+        octave: note.octave,
+        fullNote: note.name,
+        startCol: startCol,
+        colDuration: colDuration,
+        rowIdx: rowIdx,
+        x: startCol * COL_WIDTH,
+        y: rowIdx * ROW_HEIGHT,
+        w: Math.min(colDuration * COL_WIDTH, (maxCols - startCol) * COL_WIDTH),
+        h: ROW_HEIGHT,
+        color: NOTE_CONFIG[rowIdx].color
+      });
     }
 
-    // 2. Process and Filter Note Blocks
-    noteBlocks = [];
-    const secPerColumn = 15 / bpm;
-
-    parsedMidi.tracks.forEach((track, layerIdx) => {
-      const instrumentName = track.instrument ? track.instrument.name : `Layer ${layerIdx + 1}`;
-
-      track.notes.forEach(note => {
-        // Strict 5-minute cap
-        if (note.time > 300) return;
-
-        const startCol = Math.floor(note.time / secPerColumn);
-        const colDuration = Math.max(1, Math.round(note.duration / secPerColumn));
-
-        // Enforce max columns limit
-        if (startCol >= maxCols) return;
-
-        // Check if note is in currently selected octave
-        if (note.octave === currentOctave) {
-          // Convert Pitch Name (e.g., "C#") to row index 0..11
-          const noteBaseName = note.pitch; // E.g., 'C', 'C#', etc.
-          const rowIdx = NOTE_CONFIG.findIndex(cfg => cfg.name === noteBaseName);
-
-          if (rowIdx !== -1) {
-            const block = {
-              layer: layerIdx + 1,
-              instrument: instrumentName,
-              noteName: note.name,
-              pitch: noteBaseName,
-              octave: note.octave,
-              colStart: startCol,
-              colDuration: colDuration,
-              timeSec: note.time,
-              durationSec: note.duration,
-              x: startCol * COL_WIDTH,
-              y: rowIdx * ROW_HEIGHT,
-              w: Math.min(colDuration * COL_WIDTH, (maxCols - startCol) * COL_WIDTH),
-              h: ROW_HEIGHT,
-              color: NOTE_CONFIG[rowIdx].color
-            };
-            noteBlocks.push(block);
-          }
-        }
-      });
+    // Process all tracks & notes
+    parsedMidi.tracks.forEach((track, idx) => {
+      const instName = track.instrument ? track.instrument.name : `Instrument ${idx + 1}`;
+      track.notes.forEach(note => addNoteToLayers(instName, note));
     });
 
-    // 3. Render Note Blocks onto Grid
-    noteBlocks.forEach(b => {
-      ctx.fillStyle = b.color;
-      ctx.fillRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
+    renderStackedGrids(maxCols);
 
-      // Block outline
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
-    });
-
-    document.getElementById('inspector').innerText = 
-      `Loaded! Tempo: ${bpm} BPM | Max Columns: ${maxCols} | Showing Octave: ${currentOctave}`;
+    document.getElementById('inspectorText').innerText = 
+      `Processed ${processedLayers.length} Layer(s) | Tempo: ${bpm} BPM | Grid Limit: ${maxCols} Columns`;
   }
 
-  // Handle Canvas Tap/Click for Note Details
-  document.getElementById('gridCanvas').addEventListener('click', (e) => {
-    const canvas = document.getElementById('gridCanvas');
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+  function renderStackedGrids(maxCols) {
+    const container = document.getElementById('tracksContainer');
+    container.innerHTML = '';
 
-    const hit = noteBlocks.find(b => {
-      return clickX >= b.x && clickX <= (b.x + b.w) &&
-             clickY >= b.y && clickY <= (b.y + b.h);
+    processedLayers.forEach((layer, layerIdx) => {
+      // Create Layer Card Container
+      const card = document.createElement('div');
+      card.className = 'track-card';
+
+      // Header
+      const header = document.createElement('div');
+      header.className = 'track-header';
+      header.innerHTML = `<span>Layer ${layerIdx + 1}: ${layer.instrument}</span><span>${layer.notes.length} Notes</span>`;
+      card.appendChild(header);
+
+      // Wrapper
+      const gridWrapper = document.createElement('div');
+      gridWrapper.className = 'grid-wrapper';
+
+      // Left Labels
+      const pitchLabels = document.createElement('div');
+      pitchLabels.className = 'pitch-labels';
+      NOTE_CONFIG.forEach(cfg => {
+        const lbl = document.createElement('div');
+        lbl.className = 'pitch-label';
+        lbl.style.backgroundColor = cfg.color;
+        lbl.innerText = cfg.name;
+        pitchLabels.appendChild(lbl);
+      });
+      gridWrapper.appendChild(pitchLabels);
+
+      // Scrollable Canvas Area
+      const canvasContainer = document.createElement('div');
+      canvasContainer.className = 'canvas-container';
+
+      const canvas = document.createElement('canvas');
+      canvas.width = maxCols * COL_WIDTH;
+      canvas.height = 12 * ROW_HEIGHT;
+
+      const ctx = canvas.getContext('2d');
+
+      // 1. Draw Checkered Background Grid (Horizontal Rectangles)
+      for (let col = 0; col < maxCols; col++) {
+        for (let row = 0; row < 12; row++) {
+          const isDark = (col + row) % 2 === 0;
+          ctx.fillStyle = isDark ? '#1a0e2e' : '#23133d';
+          ctx.fillRect(col * COL_WIDTH, row * ROW_HEIGHT, COL_WIDTH, ROW_HEIGHT);
+
+          ctx.strokeStyle = '#2d184d';
+          ctx.strokeRect(col * COL_WIDTH, row * ROW_HEIGHT, COL_WIDTH, ROW_HEIGHT);
+        }
+      }
+
+      // 2. Draw Note Blocks for this Layer
+      layer.notes.forEach(b => {
+        ctx.fillStyle = b.color;
+        ctx.fillRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
+      });
+
+      // Click event for details
+      canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+
+        const hit = layer.notes.find(b => {
+          return clickX >= b.x && clickX <= (b.x + b.w) &&
+                 clickY >= b.y && clickY <= (b.y + b.h);
+        });
+
+        if (hit) {
+          document.getElementById('inspectorText').innerText = 
+            `Layer ${layerIdx + 1} (${layer.instrument})  ➔  Note: ${hit.fullNote} (Octave ${hit.octave})  |  Column Start: ${hit.startCol + 1}  |  Block Length: ${hit.colDuration} cell(s)`;
+        }
+      });
+
+      canvasContainer.appendChild(canvas);
+      gridWrapper.appendChild(canvasContainer);
+      card.appendChild(gridWrapper);
+      container.appendChild(card);
     });
-
-    if (hit) {
-      document.getElementById('inspector').innerText = 
-        `[Note Info] Pitch: ${hit.noteName} | Octave: ${hit.octave} | Layer: ${hit.layer} (${hit.instrument}) | Column Start: ${hit.colStart + 1} | Length: ${hit.colDuration} grid block(s)`;
-    }
-  });
+  }
 
   // Audio Preview
   document.getElementById('playBtn').addEventListener('click', async () => {
