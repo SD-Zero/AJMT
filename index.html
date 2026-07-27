@@ -264,6 +264,19 @@
     "Gentle Brass": "gentlebrass"
   };
 
+  // Base Volume Adjustments (dB) per instrument to equalize overall mix
+  const INSTRUMENT_VOLUMES = {
+    "Grand Piano": 0,
+    "Simple Piano": -1,
+    "Bass": -3,
+    "Chip Synth": -7,
+    "Chirping Bells": +2,
+    "Gritty Brass": -6,
+    "Sunny Synth": -5,
+    "Harp": +4,
+    "Gentle Brass": -2
+  };
+
   const ROW_HEIGHT = 16;
   const COL_WIDTH = 28;
 
@@ -273,16 +286,36 @@
     return Math.floor((300 * bpm) / 15);
   }
 
-  function getFallbackSynthForLayer(layerIdx) {
+  // Calculates velocity (0.25 to 1.0) based on octave to recreate AJ's quieter low notes
+  function getVelocityForOctave(octave) {
+    const oct = Math.max(0, Math.min(7, octave));
+    const octaveVelocityMap = {
+      0: 0.25,
+      1: 0.35,
+      2: 0.50,
+      3: 0.70,
+      4: 0.85,
+      5: 0.95,
+      6: 1.00,
+      7: 1.00
+    };
+    return octaveVelocityMap[oct] || 0.8;
+  }
+
+  function getFallbackSynthForLayer(layerIdx, instrumentName) {
     if (!layerFallbackSynths[layerIdx]) {
+      const volDb = INSTRUMENT_VOLUMES[instrumentName] || 0;
       layerFallbackSynths[layerIdx] = new Tone.PolySynth(Tone.Synth, {
+        volume: volDb,
         envelope: {
           attack: 0.01,
           decay: 0.3,
           sustain: 0.8,
-          release: 1.2 // Fades out smoothly instead of harsh cut
+          release: 1.2
         }
       }).toDestination();
+    } else {
+      layerFallbackSynths[layerIdx].volume.value = INSTRUMENT_VOLUMES[instrumentName] || 0;
     }
     return layerFallbackSynths[layerIdx];
   }
@@ -292,6 +325,7 @@
     const key = `${layerIdx}_${prefix}`;
 
     if (!layerSamplers[key]) {
+      const volDb = INSTRUMENT_VOLUMES[instrumentName] || 0;
       layerSamplers[key] = new Tone.Sampler({
         urls: {
           C2: `${prefix}_c2.mp3`,
@@ -299,19 +333,22 @@
           C6: `${prefix}_c6.mp3`
         },
         baseUrl: "./",
-        release: 1.2 // Smooth fade-out tail for audio files
+        volume: volDb,
+        release: 1.2
       }).toDestination();
     }
     return layerSamplers[key];
   }
 
-  async function playNoteSample(layerIdx, instrumentName, fullNote) {
+  async function playNoteSample(layerIdx, instrumentName, fullNote, octave) {
     await Tone.start();
+    const velocity = getVelocityForOctave(octave);
     const sampler = getSamplerForLayer(layerIdx, instrumentName);
+
     if (sampler && sampler.loaded) {
-      sampler.triggerAttackRelease(fullNote, "4n");
+      sampler.triggerAttackRelease(fullNote, "4n", undefined, velocity);
     } else {
-      getFallbackSynthForLayer(layerIdx).triggerAttackRelease(fullNote, "4n");
+      getFallbackSynthForLayer(layerIdx, instrumentName).triggerAttackRelease(fullNote, "4n", undefined, velocity);
     }
   }
 
@@ -562,7 +599,7 @@
 
           layer.notes.push(newNote);
           draw();
-          playNoteSample(layerIdx, layer.instrument, fullNote);
+          playNoteSample(layerIdx, layer.instrument, fullNote, placementOctave);
         }
       });
 
@@ -597,7 +634,7 @@
       activeEditingNote.fullNote = `${activeEditingNote.pitch}${activeEditingNote.octave}`;
 
       const layer = processedLayers[activeEditingLayerIdx];
-      if (layer) playNoteSample(activeEditingLayerIdx, layer.instrument, activeEditingNote.fullNote);
+      if (layer) playNoteSample(activeEditingLayerIdx, layer.instrument, activeEditingNote.fullNote, activeEditingNote.octave);
       redrawAll();
     }
     document.getElementById('inspectorModal').style.display = 'none';
@@ -672,11 +709,13 @@
       layer.notes.forEach(note => {
         const time = note.startCol * secPerCol;
         const dur = note.colDuration * secPerCol;
+        const velocity = getVelocityForOctave(note.octave);
+
         Tone.Transport.schedule((t) => {
           if (sampler && sampler.loaded) {
-            sampler.triggerAttackRelease(note.fullNote, dur, t);
+            sampler.triggerAttackRelease(note.fullNote, dur, t, velocity);
           } else {
-            getFallbackSynthForLayer(layerIdx).triggerAttackRelease(note.fullNote, dur, t);
+            getFallbackSynthForLayer(layerIdx, layer.instrument).triggerAttackRelease(note.fullNote, dur, t, velocity);
           }
         }, time);
       });
@@ -689,7 +728,4 @@
   });
 
   renderStackedGrids();
-</script>
-
-</body>
-</html>
+</script></body></html>
