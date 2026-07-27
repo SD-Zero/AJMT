@@ -128,10 +128,11 @@
       overflow-x: auto;
       overflow-y: hidden;
       background: #140824;
+      position: relative;
     }
     canvas { display: block; cursor: pointer; }
 
-    /* Note Inspector Modal GUI */
+    /* Modal GUI */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -223,10 +224,13 @@
 <script>
   let parsedMidi = null;
   let processedLayers = [];
+  let layerDrawFunctions = [];
   let isSyncingScroll = false;
   let samplers = {};
   let activeEditingNote = null;
-  let activeEditingLayer = null;
+  let activeEditingLayerIdx = null;
+  let playheadX = -1;
+  let animationFrameId = null;
 
   const NOTE_CONFIG = [
     { name: 'B',  color: '#ff1493' },
@@ -284,16 +288,21 @@
     return samplers[prefix];
   }
 
-  function playNoteSample(instrumentName, fullNote) {
-    Tone.start();
+  async function playNoteSample(instrumentName, fullNote) {
+    await Tone.start();
     const sampler = getSampler(instrumentName);
     if (sampler) {
       sampler.triggerAttackRelease(fullNote, "8n");
     }
   }
 
+  function redrawAll() {
+    layerDrawFunctions.forEach(fn => fn());
+  }
+
   document.getElementById('tempoInput').addEventListener('change', () => {
     if (parsedMidi) processAndRender();
+    else renderStackedGrids();
   });
 
   document.getElementById('addLayerBtn').addEventListener('click', () => {
@@ -306,7 +315,7 @@
       instrument: AJ_INSTRUMENTS[processedLayers.length % AJ_INSTRUMENTS.length],
       notes: []
     });
-    renderStackedGrids(getMaxColumns());
+    renderStackedGrids();
   });
 
   document.getElementById('midiInput').addEventListener('change', async (e) => {
@@ -376,13 +385,15 @@
       track.notes.forEach(note => addNoteToLayers(inst, note));
     });
 
-    renderStackedGrids(maxCols);
+    renderStackedGrids();
   }
 
-  function renderStackedGrids(maxCols) {
+  function renderStackedGrids() {
+    const maxCols = getMaxColumns();
     const container = document.getElementById('tracksContainer');
     container.innerHTML = '';
     const scrollContainers = [];
+    layerDrawFunctions = [];
 
     if (processedLayers.length === 0) {
       processedLayers.push({ id: 1, instrument: "Grand Piano", notes: [] });
@@ -454,6 +465,7 @@
       function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        // Grid Background
         for (let col = 0; col < maxCols; col++) {
           for (let row = 0; row < 12; row++) {
             const isDark = (col + row) % 2 === 0;
@@ -462,6 +474,7 @@
           }
         }
 
+        // Render Notes
         layer.notes.forEach(b => {
           b.x = b.startCol * COL_WIDTH;
           b.w = b.colDuration * COL_WIDTH;
@@ -477,11 +490,20 @@
           ctx.font = 'bold 10px sans-serif';
           ctx.fillText(b.octave, b.x + 4, b.y + 12);
         });
+
+        // Render Playhead Line
+        if (playheadX >= 0) {
+          ctx.fillStyle = '#ffe66d';
+          ctx.fillRect(playheadX, 0, 3, canvas.height);
+        }
+
         countSpan.innerText = `${layer.notes.length} Notes`;
       }
 
+      layerDrawFunctions.push(draw);
       draw();
 
+      // Click event logic
       canvas.addEventListener('click', (e) => {
         const rect = canvas.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -495,15 +517,13 @@
         );
 
         if (existingNote) {
-          // Open Inspector Modal GUI
           activeEditingNote = existingNote;
-          activeEditingLayer = layer;
+          activeEditingLayerIdx = layerIdx;
           document.getElementById('modalTitle').innerText = `Edit Note: ${existingNote.pitch}`;
           document.getElementById('editOctave').value = existingNote.octave;
           document.getElementById('editDuration').value = existingNote.colDuration;
           document.getElementById('inspectorModal').style.display = 'flex';
         } else {
-          // Add Note on Empty Space
           const placementOctave = parseInt(document.getElementById('defaultOctave').value) || 4;
           const pitchName = NOTE_CONFIG[rowIdx].name;
           const fullNote = `${pitchName}${placementOctave}`;
@@ -523,8 +543,8 @@
           };
 
           layer.notes.push(newNote);
-          playNoteSample(layer.instrument, fullNote);
           draw();
+          playNoteSample(layer.instrument, fullNote);
         }
       });
 
@@ -548,7 +568,7 @@
     });
   }
 
-  // Modal Handlers
+  // Modal Listeners
   document.getElementById('saveNoteBtn').addEventListener('click', () => {
     if (activeEditingNote) {
       const newOct = parseInt(document.getElementById('editOctave').value) || 4;
@@ -558,35 +578,71 @@
       activeEditingNote.colDuration = newDur;
       activeEditingNote.fullNote = `${activeEditingNote.pitch}${activeEditingNote.octave}`;
 
-      playNoteSample(activeEditingLayer.instrument, activeEditingNote.fullNote);
-      renderStackedGrids(getMaxColumns());
+      const layer = processedLayers[activeEditingLayerIdx];
+      if (layer) playNoteSample(layer.instrument, activeEditingNote.fullNote);
+      redrawAll();
     }
     document.getElementById('inspectorModal').style.display = 'none';
   });
 
   document.getElementById('deleteNoteBtn').addEventListener('click', () => {
-    if (activeEditingNote && activeEditingLayer) {
-      const idx = activeEditingLayer.notes.indexOf(activeEditingNote);
-      if (idx !== -1) {
-        activeEditingLayer.notes.splice(idx, 1);
-        renderStackedGrids(getMaxColumns());
+    if (activeEditingNote && activeEditingLayerIdx !== null) {
+      const layer = processedLayers[activeEditingLayerIdx];
+      if (layer) {
+        const idx = layer.notes.indexOf(activeEditingNote);
+        if (idx !== -1) {
+          layer.notes.splice(idx, 1);
+          redrawAll();
+        }
       }
     }
     document.getElementById('inspectorModal').style.display = 'none';
   });
 
-  // Audio Playback Handler
+  // Animated Playhead Loop
+  function updatePlayhead() {
+    if (Tone.Transport.state === "started") {
+      const bpm = parseInt(document.getElementById('tempoInput').value) || 175;
+      const secPerCol = 15 / bpm;
+      const currentSec = Tone.Transport.seconds;
+      const colPos = currentSec / secPerCol;
+
+      playheadX = colPos * COL_WIDTH;
+      redrawAll();
+
+      // Auto-scroll track containers to follow playhead
+      const containers = document.querySelectorAll('.canvas-container');
+      containers.forEach(c => {
+        if (playheadX > c.scrollLeft + c.clientWidth - 100) {
+          c.scrollLeft = playheadX - 100;
+        }
+      });
+
+      animationFrameId = requestAnimationFrame(updatePlayhead);
+    } else {
+      playheadX = -1;
+      redrawAll();
+    }
+  }
+
+  // Preview Audio Handler
   document.getElementById('playBtn').addEventListener('click', async () => {
     const playBtn = document.getElementById('playBtn');
+
+    if (Tone.Transport.state === "started") {
+      Tone.Transport.stop();
+      playBtn.innerText = "▶ Preview Audio";
+      playheadX = -1;
+      redrawAll();
+      return;
+    }
+
     playBtn.disabled = true;
-    playBtn.innerText = "⏳ Loading Audio...";
+    playBtn.innerText = "⏳ Loading...";
 
     await Tone.start();
-    
-    // Ensure all samplers are created
-    processedLayers.forEach(l => getSampler(l.instrument));
 
-    // Wait for Tone to load sample files
+    processedLayers.forEach(l => getSampler(l.instrument));
     await Tone.loaded();
 
     Tone.Transport.stop();
@@ -610,11 +666,13 @@
     });
 
     Tone.Transport.start();
-    playBtn.innerText = "▶ Preview Audio";
+    playBtn.innerText = "⏹ Stop Preview";
     playBtn.disabled = false;
+
+    updatePlayhead();
   });
 
-  renderStackedGrids(getMaxColumns());
+  renderStackedGrids();
 </script>
 
 </body>
