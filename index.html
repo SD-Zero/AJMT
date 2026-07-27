@@ -42,15 +42,14 @@
     h1 { color: var(--accent); margin: 0; font-size: 1.3rem; width: 100%; }
     .control-group { display: flex; align-items: center; gap: 8px; }
     label { font-size: 0.9rem; color: #d8c7ed; font-weight: 600; }
-    input[type="number"] {
+    input[type="number"], select {
       background: #190b2c;
       color: var(--accent);
       border: 1px solid #5a388a;
       padding: 6px 10px;
       border-radius: 6px;
       font-weight: bold;
-      font-size: 0.95rem;
-      width: 80px;
+      font-size: 0.9rem;
     }
     .btn {
       background: var(--highlight);
@@ -117,7 +116,18 @@
       border-bottom: 1px solid #4a2d6d;
       display: flex;
       justify-content: space-between;
+      align-items: center;
     }
+    .instrument-select {
+      background: #231438;
+      color: var(--accent);
+      border: 1px solid var(--highlight);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 0.85rem;
+    }
+
     .grid-wrapper { display: flex; width: 100%; }
     
     /* Pitch Labels */
@@ -200,7 +210,7 @@
     { name: 'C',  color: '#ff0000' }  // Bright Red
   ];
 
-  // Official AJ Instruments mapping
+  // 10 Official AJ Instruments
   const AJ_INSTRUMENTS = [
     "Grand Piano", "Simple Piano", "Bass", "Chip Synth", 
     "Drum Kit", "Chirping Bells", "Gritty Brass", 
@@ -214,6 +224,26 @@
     let bpm = parseInt(document.getElementById('tempoInput').value) || 175;
     bpm = Math.max(65, Math.min(240, bpm));
     return Math.floor((300 * bpm) / 15);
+  }
+
+  // Automatic instrument matcher from General MIDI / Track Names
+  function autoDetectAJInstrument(trackName, midiNumber) {
+    const name = (trackName || "").toLowerCase();
+    if (name.includes("drum") || name.includes("percussion")) return "Drum Kit";
+    if (name.includes("bass")) return "Bass";
+    if (name.includes("bell") || name.includes("chime")) return "Chirping Bells";
+    if (name.includes("brass") || name.includes("horn") || name.includes("trumpet")) return "Gritty Brass";
+    if (name.includes("synth") || name.includes("lead")) return "Chip Synth";
+    if (name.includes("harp")) return "Harp";
+
+    if (midiNumber !== undefined) {
+      if (midiNumber >= 32 && midiNumber <= 39) return "Bass";
+      if (midiNumber >= 56 && midiNumber <= 63) return "Gentle Brass";
+      if (midiNumber >= 46 && midiNumber <= 46) return "Harp";
+      if (midiNumber >= 80 && midiNumber <= 87) return "Sunny Synth";
+      if (midiNumber >= 9 && midiNumber <= 15) return "Chirping Bells";
+    }
+    return "Grand Piano"; // Default fall-back
   }
 
   document.getElementById('tempoInput').addEventListener('change', () => {
@@ -251,7 +281,6 @@
       const rowIdx = NOTE_CONFIG.findIndex(c => c.name === pitchName);
       if (rowIdx === -1) return;
 
-      // Check for non-overlapping layer
       let targetLayer = processedLayers.find(layer => {
         if (layer.instrument !== instrumentName) return false;
         return !layer.notes.some(n => 
@@ -261,7 +290,7 @@
       });
 
       if (!targetLayer) {
-        if (processedLayers.length >= 11) return; // Hard 11 layer cap
+        if (processedLayers.length >= 11) return; // 11 layer max
         targetLayer = {
           id: processedLayers.length + 1,
           instrument: instrumentName,
@@ -285,10 +314,12 @@
       });
     }
 
-    parsedMidi.tracks.forEach((track, idx) => {
-      // Map MIDI instruments to nearest official AJ Instrument
-      const mappedInst = AJ_INSTRUMENTS[idx % AJ_INSTRUMENTS.length];
-      track.notes.forEach(note => addNoteToLayers(mappedInst, note));
+    parsedMidi.tracks.forEach((track) => {
+      const detectedInst = autoDetectAJInstrument(
+        track.name, 
+        track.instrument ? track.instrument.number : undefined
+      );
+      track.notes.forEach(note => addNoteToLayers(detectedInst, note));
     });
 
     renderStackedGrids(maxCols);
@@ -305,9 +336,43 @@
       const card = document.createElement('div');
       card.className = 'track-card';
 
+      // Header with Dropdown Instrument Switcher
       const header = document.createElement('div');
       header.className = 'track-header';
-      header.innerHTML = `<span>Layer ${layerIdx + 1}: ${layer.instrument}</span><span>${layer.notes.length} Notes</span>`;
+
+      const labelGroup = document.createElement('div');
+      labelGroup.style.display = 'flex';
+      labelGroup.style.alignItems = 'center';
+      labelGroup.style.gap = '10px';
+
+      const titleSpan = document.createElement('span');
+      titleSpan.innerText = `Layer ${layerIdx + 1}:`;
+
+      // Create Dropdown for changing instrument
+      const select = document.createElement('select');
+      select.className = 'instrument-select';
+      AJ_INSTRUMENTS.forEach(inst => {
+        const opt = document.createElement('option');
+        opt.value = inst;
+        opt.innerText = inst;
+        if (inst === layer.instrument) opt.selected = true;
+        select.appendChild(opt);
+      });
+
+      select.addEventListener('change', (e) => {
+        layer.instrument = e.target.value;
+        document.getElementById('inspectorText').innerText = 
+          `Changed Layer ${layerIdx + 1} instrument to ${layer.instrument}`;
+      });
+
+      labelGroup.appendChild(titleSpan);
+      labelGroup.appendChild(select);
+
+      const countSpan = document.createElement('span');
+      countSpan.innerText = `${layer.notes.length} Notes`;
+
+      header.appendChild(labelGroup);
+      header.appendChild(countSpan);
       card.appendChild(header);
 
       const gridWrapper = document.createElement('div');
@@ -333,7 +398,7 @@
       canvas.height = 12 * ROW_HEIGHT;
       const ctx = canvas.getContext('2d');
 
-      // 1. Draw Background Checkered Grid WITHOUT distracting cell borders
+      // 1. Draw Background Checkered Grid
       for (let col = 0; col < maxCols; col++) {
         for (let row = 0; row < 12; row++) {
           const isDark = (col + row) % 2 === 0;
@@ -342,7 +407,7 @@
         }
       }
 
-      // 2. Render Clean Note Blocks with crisp outlines
+      // 2. Render Note Blocks
       layer.notes.forEach(b => {
         ctx.fillStyle = b.color;
         ctx.fillRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
@@ -352,7 +417,7 @@
         ctx.strokeRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
       });
 
-      // Click event for note inspection
+      // Note Inspector on Click
       canvas.addEventListener('click', (e) => {
         const rect = canvas.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -375,7 +440,7 @@
       container.appendChild(card);
     });
 
-    // Synchronize horizontal scrolling across ALL layer canvases simultaneously
+    // Sync Horizontal Scrolling Across All Layers
     scrollContainers.forEach(targetContainer => {
       targetContainer.addEventListener('scroll', () => {
         if (!isSyncingScroll) {
@@ -408,6 +473,5 @@
     Tone.Transport.start();
   });
 </script>
-
 </body>
-</html>
+  </html>
