@@ -132,7 +132,7 @@
     }
     canvas { display: block; cursor: pointer; }
 
-    /* Modal GUI */
+    /* Note Inspector Modal */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -227,10 +227,10 @@
   let layerDrawFunctions = [];
   let isSyncingScroll = false;
   let samplers = {};
+  let fallbackSynth = null;
   let activeEditingNote = null;
   let activeEditingLayerIdx = null;
   let playheadX = -1;
-  let animationFrameId = null;
 
   const NOTE_CONFIG = [
     { name: 'B',  color: '#ff1493' },
@@ -273,6 +273,13 @@
     return Math.floor((300 * bpm) / 15);
   }
 
+  function getFallbackSynth() {
+    if (!fallbackSynth) {
+      fallbackSynth = new Tone.PolySynth(Tone.Synth).toDestination();
+    }
+    return fallbackSynth;
+  }
+
   function getSampler(instrumentName) {
     const prefix = SAMPLE_PREFIXES[instrumentName] || "grandpiano";
     if (!samplers[prefix]) {
@@ -282,7 +289,7 @@
           C4: `${prefix}_c4.mp3`,
           C6: `${prefix}_c6.mp3`
         },
-        baseUrl: "./samples/"
+        baseUrl: "./" // Root directory (no subfolder)
       }).toDestination();
     }
     return samplers[prefix];
@@ -291,8 +298,10 @@
   async function playNoteSample(instrumentName, fullNote) {
     await Tone.start();
     const sampler = getSampler(instrumentName);
-    if (sampler) {
+    if (sampler && sampler.loaded) {
       sampler.triggerAttackRelease(fullNote, "8n");
+    } else {
+      getFallbackSynth().triggerAttackRelease(fullNote, "8n");
     }
   }
 
@@ -503,7 +512,7 @@
       layerDrawFunctions.push(draw);
       draw();
 
-      // Click event logic
+      // Canvas click handling
       canvas.addEventListener('click', (e) => {
         const rect = canvas.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -568,7 +577,7 @@
     });
   }
 
-  // Modal Listeners
+  // Modal Handlers
   document.getElementById('saveNoteBtn').addEventListener('click', () => {
     if (activeEditingNote) {
       const newOct = parseInt(document.getElementById('editOctave').value) || 4;
@@ -610,7 +619,6 @@
       playheadX = colPos * COL_WIDTH;
       redrawAll();
 
-      // Auto-scroll track containers to follow playhead
       const containers = document.querySelectorAll('.canvas-container');
       containers.forEach(c => {
         if (playheadX > c.scrollLeft + c.clientWidth - 100) {
@@ -618,7 +626,7 @@
         }
       });
 
-      animationFrameId = requestAnimationFrame(updatePlayhead);
+      requestAnimationFrame(updatePlayhead);
     } else {
       playheadX = -1;
       redrawAll();
@@ -637,13 +645,9 @@
       return;
     }
 
-    playBtn.disabled = true;
-    playBtn.innerText = "⏳ Loading...";
-
     await Tone.start();
 
     processedLayers.forEach(l => getSampler(l.instrument));
-    await Tone.loaded();
 
     Tone.Transport.stop();
     Tone.Transport.cancel();
@@ -660,20 +664,22 @@
         const time = note.startCol * secPerCol;
         const dur = note.colDuration * secPerCol;
         Tone.Transport.schedule((t) => {
-          sampler.triggerAttackRelease(note.fullNote, dur, t);
+          if (sampler && sampler.loaded) {
+            sampler.triggerAttackRelease(note.fullNote, dur, t);
+          } else {
+            getFallbackSynth().triggerAttackRelease(note.fullNote, dur, t);
+          }
         }, time);
       });
     });
 
     Tone.Transport.start();
     playBtn.innerText = "⏹ Stop Preview";
-    playBtn.disabled = false;
 
     updatePlayhead();
   });
 
   renderStackedGrids();
 </script>
-
 </body>
 </html>
