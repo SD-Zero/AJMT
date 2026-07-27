@@ -64,7 +64,6 @@
     .btn:disabled { background: #554466; color: #887799; cursor: not-allowed; }
     input[type="file"] { display: none; }
 
-    /* Stacked Track Containers */
     .tracks-container {
       display: flex;
       flex-direction: column;
@@ -102,7 +101,6 @@
 
     .grid-wrapper { display: flex; width: 100%; }
     
-    /* Pitch Labels */
     .pitch-labels {
       display: flex;
       flex-direction: column;
@@ -123,7 +121,6 @@
       box-sizing: border-box;
     }
 
-    /* Scrollable Canvas Container */
     .canvas-container {
       flex: 1;
       overflow-x: auto;
@@ -139,7 +136,7 @@
   <h1>Animal Jam Mastertrack Studio</h1>
   
   <div class="control-group">
-    <button class="btn" onclick="document.getElementById('midiInput').click()">📁 Load Song File</button>
+    <button class="btn" onclick="document.getElementById('midiInput').click()">📁 Load Song</button>
     <input type="file" id="midiInput" accept=".mid,.midi">
   </div>
 
@@ -149,7 +146,13 @@
   </div>
 
   <div class="control-group">
-    <button id="playBtn" class="btn" disabled>▶ Preview Audio</button>
+    <label for="defaultOctave">Placement Octave:</label>
+    <input type="number" id="defaultOctave" value="4" min="0" max="7">
+  </div>
+
+  <div class="control-group">
+    <button id="addLayerBtn" class="btn" style="background:#ffe66d; color:#231438;">+ Add Layer</button>
+    <button id="playBtn" class="btn">▶ Preview Audio</button>
   </div>
 </div>
 
@@ -157,32 +160,42 @@
 
 <script>
   let parsedMidi = null;
-  let synth = null;
   let processedLayers = [];
   let isSyncingScroll = false;
+  let samplers = {};
 
-  // AJ Pitch Colors (B down to C)
   const NOTE_CONFIG = [
-    { name: 'B',  color: '#ff1493' }, // Hot Pink
-    { name: 'A#', color: '#8a2be2' }, // Purple
-    { name: 'A',  color: '#0033cc' }, // Dark Blue
-    { name: 'G#', color: '#0074d9' }, // Mid Blue
-    { name: 'G',  color: '#00f3ff' }, // Light Neon Blue
-    { name: 'F#', color: '#008080' }, // Teal
-    { name: 'F',  color: '#00ff00' }, // Neon Green
-    { name: 'E',  color: '#32cd32' }, // Neon Lime Green
-    { name: 'D#', color: '#ffd700' }, // Gold
-    { name: 'D',  color: '#ff7f00' }, // Orange
-    { name: 'C#', color: '#ff4500' }, // Reddish Orange
-    { name: 'C',  color: '#ff0000' }  // Bright Red
+    { name: 'B',  color: '#ff1493' },
+    { name: 'A#', color: '#8a2be2' },
+    { name: 'A',  color: '#0033cc' },
+    { name: 'G#', color: '#0074d9' },
+    { name: 'G',  color: '#00f3ff' },
+    { name: 'F#', color: '#008080' },
+    { name: 'F',  color: '#00ff00' },
+    { name: 'E',  color: '#32cd32' },
+    { name: 'D#', color: '#ffd700' },
+    { name: 'D',  color: '#ff7f00' },
+    { name: 'C#', color: '#ff4500' },
+    { name: 'C',  color: '#ff0000' }
   ];
 
-  // 10 Official AJ Instruments
   const AJ_INSTRUMENTS = [
     "Grand Piano", "Simple Piano", "Bass", "Chip Synth", 
-    "Drum Kit", "Chirping Bells", "Gritty Brass", 
-    "Sunny Synth", "Harp", "Gentle Brass"
+    "Chirping Bells", "Gritty Brass", "Sunny Synth", "Harp", "Gentle Brass"
   ];
+
+  // Map instrument names to file prefixes
+  const SAMPLE_PREFIXES = {
+    "Grand Piano": "grandpiano",
+    "Simple Piano": "simplepiano",
+    "Bass": "bass",
+    "Chip Synth": "chipsynth",
+    "Chirping Bells": "chirpingbells",
+    "Gritty Brass": "grittybrass",
+    "Sunny Synth": "sunnysynth",
+    "Harp": "harp",
+    "Gentle Brass": "gentlebrass"
+  };
 
   const ROW_HEIGHT = 16;
   const COL_WIDTH = 28;
@@ -193,27 +206,45 @@
     return Math.floor((300 * bpm) / 15);
   }
 
-  function autoDetectAJInstrument(trackName, midiNumber) {
-    const name = (trackName || "").toLowerCase();
-    if (name.includes("drum") || name.includes("percussion")) return "Drum Kit";
-    if (name.includes("bass")) return "Bass";
-    if (name.includes("bell") || name.includes("chime")) return "Chirping Bells";
-    if (name.includes("brass") || name.includes("horn") || name.includes("trumpet")) return "Gritty Brass";
-    if (name.includes("synth") || name.includes("lead")) return "Chip Synth";
-    if (name.includes("harp")) return "Harp";
-
-    if (midiNumber !== undefined) {
-      if (midiNumber >= 32 && midiNumber <= 39) return "Bass";
-      if (midiNumber >= 56 && midiNumber <= 63) return "Gentle Brass";
-      if (midiNumber >= 46 && midiNumber <= 46) return "Harp";
-      if (midiNumber >= 80 && midiNumber <= 87) return "Sunny Synth";
-      if (midiNumber >= 9 && midiNumber <= 15) return "Chirping Bells";
+  // Initialize Audio Samplers from uploaded samples folder
+  function getSampler(instrumentName) {
+    const prefix = SAMPLE_PREFIXES[instrumentName] || "grandpiano";
+    if (!samplers[prefix]) {
+      samplers[prefix] = new Tone.Sampler({
+        urls: {
+          C2: `${prefix}_c2.mp3`,
+          C4: `${prefix}_c4.mp3`,
+          C6: `${prefix}_c6.mp3`
+        },
+        baseUrl: "./samples/"
+      }).toDestination();
     }
-    return "Grand Piano";
+    return samplers[prefix];
+  }
+
+  function playNoteSample(instrumentName, fullNote) {
+    Tone.start();
+    const sampler = getSampler(instrumentName);
+    if (sampler && sampler.loaded) {
+      sampler.triggerAttackRelease(fullNote, "8n");
+    }
   }
 
   document.getElementById('tempoInput').addEventListener('change', () => {
     if (parsedMidi) processAndRender();
+  });
+
+  document.getElementById('addLayerBtn').addEventListener('click', () => {
+    if (processedLayers.length >= 11) {
+      alert("Maximum 11 layers allowed!");
+      return;
+    }
+    processedLayers.push({
+      id: processedLayers.length + 1,
+      instrument: AJ_INSTRUMENTS[processedLayers.length % AJ_INSTRUMENTS.length],
+      notes: []
+    });
+    renderStackedGrids(getMaxColumns());
   });
 
   document.getElementById('midiInput').addEventListener('change', async (e) => {
@@ -222,9 +253,7 @@
 
     const arrayBuffer = await file.arrayBuffer();
     parsedMidi = new Midi(arrayBuffer);
-
     processAndRender();
-    document.getElementById('playBtn').disabled = false;
   });
 
   function processAndRender() {
@@ -280,12 +309,9 @@
       });
     }
 
-    parsedMidi.tracks.forEach((track) => {
-      const detectedInst = autoDetectAJInstrument(
-        track.name, 
-        track.instrument ? track.instrument.number : undefined
-      );
-      track.notes.forEach(note => addNoteToLayers(detectedInst, note));
+    parsedMidi.tracks.forEach((track, idx) => {
+      const inst = AJ_INSTRUMENTS[idx % AJ_INSTRUMENTS.length];
+      track.notes.forEach(note => addNoteToLayers(inst, note));
     });
 
     renderStackedGrids(maxCols);
@@ -295,6 +321,10 @@
     const container = document.getElementById('tracksContainer');
     container.innerHTML = '';
     const scrollContainers = [];
+
+    if (processedLayers.length === 0) {
+      processedLayers.push({ id: 1, instrument: "Grand Piano", notes: [] });
+    }
 
     processedLayers.forEach((layer, layerIdx) => {
       const card = document.createElement('div');
@@ -358,23 +388,102 @@
       canvas.height = 12 * ROW_HEIGHT;
       const ctx = canvas.getContext('2d');
 
-      // 1. Draw Background Checkered Grid
-      for (let col = 0; col < maxCols; col++) {
-        for (let row = 0; row < 12; row++) {
-          const isDark = (col + row) % 2 === 0;
-          ctx.fillStyle = isDark ? '#1a0e2e' : '#23133d';
-          ctx.fillRect(col * COL_WIDTH, row * ROW_HEIGHT, COL_WIDTH, ROW_HEIGHT);
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. Grid Background
+        for (let col = 0; col < maxCols; col++) {
+          for (let row = 0; row < 12; row++) {
+            const isDark = (col + row) % 2 === 0;
+            ctx.fillStyle = isDark ? '#1a0e2e' : '#23133d';
+            ctx.fillRect(col * COL_WIDTH, row * ROW_HEIGHT, COL_WIDTH, ROW_HEIGHT);
+          }
         }
+
+        // 2. Render Note Blocks with Octave Indicator Text
+        layer.notes.forEach(b => {
+          ctx.fillStyle = b.color;
+          ctx.fillRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
+
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
+
+          // Octave Label inside note block
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 10px sans-serif';
+          ctx.fillText(b.octave, b.x + 4, b.y + 12);
+        });
+        countSpan.innerText = `${layer.notes.length} Notes`;
       }
 
-      // 2. Render Note Blocks
-      layer.notes.forEach(b => {
-        ctx.fillStyle = b.color;
-        ctx.fillRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
+      draw();
 
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
+      // Double Click / Double Tap Detection
+      let clickTimeout = null;
+
+      canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+
+        const col = Math.floor(clickX / COL_WIDTH);
+        const rowIdx = Math.floor(clickY / ROW_HEIGHT);
+
+        const existingIdx = layer.notes.findIndex(n => 
+          n.rowIdx === rowIdx && col >= n.startCol && col < (n.startCol + n.colDuration)
+        );
+
+        if (clickTimeout === null) {
+          // First Click / Tap
+          clickTimeout = setTimeout(() => {
+            clickTimeout = null;
+
+            if (existingIdx !== -1) {
+              // Edit Octave of Existing Note
+              const note = layer.notes[existingIdx];
+              const newOct = prompt(`Edit Octave for ${note.pitch} (0-7):`, note.octave);
+              if (newOct !== null && !isNaN(newOct)) {
+                const octNum = Math.max(0, Math.min(7, parseInt(newOct)));
+                note.octave = octNum;
+                note.fullNote = `${note.pitch}${octNum}`;
+                playNoteSample(layer.instrument, note.fullNote);
+                draw();
+              }
+            } else {
+              // Add New Note
+              const placementOctave = parseInt(document.getElementById('defaultOctave').value) || 4;
+              const pitchName = NOTE_CONFIG[rowIdx].name;
+              const fullNote = `${pitchName}${placementOctave}`;
+
+              layer.notes.push({
+                pitch: pitchName,
+                octave: placementOctave,
+                fullNote: fullNote,
+                startCol: col,
+                colDuration: 1,
+                rowIdx: rowIdx,
+                x: col * COL_WIDTH,
+                y: rowIdx * ROW_HEIGHT,
+                w: COL_WIDTH,
+                h: ROW_HEIGHT,
+                color: NOTE_CONFIG[rowIdx].color
+              });
+
+              playNoteSample(layer.instrument, fullNote);
+              draw();
+            }
+          }, 250);
+        } else {
+          // Double Click / Tap -> Delete Note
+          clearTimeout(clickTimeout);
+          clickTimeout = null;
+
+          if (existingIdx !== -1) {
+            layer.notes.splice(existingIdx, 1);
+            draw();
+          }
+        }
       });
 
       canvasContainer.appendChild(canvas);
@@ -383,7 +492,7 @@
       container.appendChild(card);
     });
 
-    // Synchronize horizontal scrolling across all layer canvases
+    // Synchronize Horizontal Scrolling
     scrollContainers.forEach(targetContainer => {
       targetContainer.addEventListener('scroll', () => {
         if (!isSyncingScroll) {
@@ -401,20 +510,26 @@
   // Audio Playback
   document.getElementById('playBtn').addEventListener('click', async () => {
     await Tone.start();
-    if (!synth) synth = new Tone.PolySynth(Tone.Synth).toDestination();
-
     Tone.Transport.cancel();
-    parsedMidi.tracks.forEach(track => {
-      track.notes.forEach(note => {
-        if (note.time <= 300) {
-          Tone.Transport.schedule((time) => {
-            synth.triggerAttackRelease(note.name, note.duration, time, note.velocity);
-          }, note.time);
-        }
+
+    processedLayers.forEach(layer => {
+      const sampler = getSampler(layer.instrument);
+      const bpm = parseInt(document.getElementById('tempoInput').value) || 175;
+      const secPerCol = 15 / bpm;
+
+      layer.notes.forEach(note => {
+        const time = note.startCol * secPerCol;
+        const dur = note.colDuration * secPerCol;
+        Tone.Transport.schedule((t) => {
+          sampler.triggerAttackRelease(note.fullNote, dur, t);
+        }, time);
       });
     });
+
     Tone.Transport.start();
   });
+
+  renderStackedGrids(getMaxColumns());
 </script>
 </body>
 </html>
