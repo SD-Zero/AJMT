@@ -31,7 +31,7 @@
       max-width: 950px;
       width: 100%;
       box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-      margin-bottom: 15px;
+      margin-bottom: 20px;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -63,34 +63,6 @@
     }
     .btn:disabled { background: #554466; color: #887799; cursor: not-allowed; }
     input[type="file"] { display: none; }
-
-    /* Clean Info Bar */
-    .inspector-card {
-      background: #2e184a;
-      border: 1px solid #5d388c;
-      border-radius: 10px;
-      padding: 12px 20px;
-      width: 100%;
-      max-width: 950px;
-      color: var(--text-main);
-      margin-bottom: 20px;
-      box-sizing: border-box;
-      font-size: 0.95rem;
-      display: flex;
-      align-items: center;
-      gap: 15px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    }
-    .inspector-badge {
-      background: var(--accent);
-      color: #231438;
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-weight: 800;
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
 
     /* Stacked Track Containers */
     .tracks-container {
@@ -167,7 +139,7 @@
   <h1>Animal Jam Mastertrack Studio</h1>
   
   <div class="control-group">
-    <button class="btn" onclick="document.getElementById('midiInput').click()">📁 Load MIDI</button>
+    <button class="btn" onclick="document.getElementById('midiInput').click()">📁 Load Song File</button>
     <input type="file" id="midiInput" accept=".mid,.midi">
   </div>
 
@@ -179,11 +151,6 @@
   <div class="control-group">
     <button id="playBtn" class="btn" disabled>▶ Preview Audio</button>
   </div>
-</div>
-
-<div class="inspector-card" id="inspectorCard">
-  <span class="inspector-badge">Status</span>
-  <span id="inspectorText">Load a MIDI file to display synchronized track layers...</span>
 </div>
 
 <div class="tracks-container" id="tracksContainer"></div>
@@ -226,7 +193,6 @@
     return Math.floor((300 * bpm) / 15);
   }
 
-  // Automatic instrument matcher from General MIDI / Track Names
   function autoDetectAJInstrument(trackName, midiNumber) {
     const name = (trackName || "").toLowerCase();
     if (name.includes("drum") || name.includes("percussion")) return "Drum Kit";
@@ -243,7 +209,7 @@
       if (midiNumber >= 80 && midiNumber <= 87) return "Sunny Synth";
       if (midiNumber >= 9 && midiNumber <= 15) return "Chirping Bells";
     }
-    return "Grand Piano"; // Default fall-back
+    return "Grand Piano";
   }
 
   document.getElementById('tempoInput').addEventListener('change', () => {
@@ -290,7 +256,7 @@
       });
 
       if (!targetLayer) {
-        if (processedLayers.length >= 11) return; // 11 layer max
+        if (processedLayers.length >= 11) return;
         targetLayer = {
           id: processedLayers.length + 1,
           instrument: instrumentName,
@@ -323,8 +289,6 @@
     });
 
     renderStackedGrids(maxCols);
-    document.getElementById('inspectorText').innerText = 
-      `Rendered ${processedLayers.length} Layer(s) | Synchronized Timeline Active | Tempo: ${bpm} BPM`;
   }
 
   function renderStackedGrids(maxCols) {
@@ -336,7 +300,6 @@
       const card = document.createElement('div');
       card.className = 'track-card';
 
-      // Header with Dropdown Instrument Switcher
       const header = document.createElement('div');
       header.className = 'track-header';
 
@@ -348,7 +311,6 @@
       const titleSpan = document.createElement('span');
       titleSpan.innerText = `Layer ${layerIdx + 1}:`;
 
-      // Create Dropdown for changing instrument
       const select = document.createElement('select');
       select.className = 'instrument-select';
       AJ_INSTRUMENTS.forEach(inst => {
@@ -361,8 +323,6 @@
 
       select.addEventListener('change', (e) => {
         layer.instrument = e.target.value;
-        document.getElementById('inspectorText').innerText = 
-          `Changed Layer ${layerIdx + 1} instrument to ${layer.instrument}`;
       });
 
       labelGroup.appendChild(titleSpan);
@@ -417,30 +377,13 @@
         ctx.strokeRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
       });
 
-      // Note Inspector on Click
-      canvas.addEventListener('click', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top;
-
-        const hit = layer.notes.find(b => {
-          return clickX >= b.x && clickX <= (b.x + b.w) &&
-                 clickY >= b.y && clickY <= (b.y + b.h);
-        });
-
-        if (hit) {
-          document.getElementById('inspectorText').innerText = 
-            `Layer ${layerIdx + 1} (${layer.instrument})  ➔  Note: ${hit.fullNote} (Octave ${hit.octave})  |  Start Column: ${hit.startCol + 1}  |  Length: ${hit.colDuration} block(s)`;
-        }
-      });
-
       canvasContainer.appendChild(canvas);
       gridWrapper.appendChild(canvasContainer);
       card.appendChild(gridWrapper);
       container.appendChild(card);
     });
 
-    // Sync Horizontal Scrolling Across All Layers
+    // Synchronize horizontal scrolling across all layer canvases
     scrollContainers.forEach(targetContainer => {
       targetContainer.addEventListener('scroll', () => {
         if (!isSyncingScroll) {
@@ -474,4 +417,4 @@
   });
 </script>
 </body>
-  </html>
+</html>
