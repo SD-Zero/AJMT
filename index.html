@@ -178,7 +178,7 @@
   <h1>Animal Jam Mastertrack Studio</h1>
   
   <div class="control-group">
-    <button class="btn" onclick="document.getElementById('songInput').click()">📁 Load MIDI / MP3</button>
+    <button class="btn" onclick="document.getElementById('songInput').click()">📁 Load Song (MIDI/MP3)</button>
     <input type="file" id="songInput" accept=".mid,.midi,.mp3,.wav">
   </div>
 
@@ -233,18 +233,18 @@
   let playheadX = -1;
 
   const NOTE_CONFIG = [
-    { name: 'B',  color: '#ff1493', semitone: 11 },
-    { name: 'A#', color: '#8a2be2', semitone: 10 },
-    { name: 'A',  color: '#0033cc', semitone: 9 },
-    { name: 'G#', color: '#0074d9', semitone: 8 },
-    { name: 'G',  color: '#00f3ff', semitone: 7 },
-    { name: 'F#', color: '#008080', semitone: 6 },
-    { name: 'F',  color: '#00ff00', semitone: 5 },
-    { name: 'E',  color: '#32cd32', semitone: 4 },
-    { name: 'D#', color: '#ffd700', semitone: 3 },
-    { name: 'D',  color: '#ff7f00', semitone: 2 },
-    { name: 'C#', color: '#ff4500', semitone: 1 },
-    { name: 'C',  color: '#ff0000', semitone: 0 }
+    { name: 'B',  color: '#ff1493' },
+    { name: 'A#', color: '#8a2be2' },
+    { name: 'A',  color: '#0033cc' },
+    { name: 'G#', color: '#0074d9' },
+    { name: 'G',  color: '#00f3ff' },
+    { name: 'F#', color: '#008080' },
+    { name: 'F',  color: '#00ff00' },
+    { name: 'E',  color: '#32cd32' },
+    { name: 'D#', color: '#ffd700' },
+    { name: 'D',  color: '#ff7f00' },
+    { name: 'C#', color: '#ff4500' },
+    { name: 'C',  color: '#ff0000' }
   ];
 
   const AJ_INSTRUMENTS = [
@@ -288,14 +288,8 @@
   function getVelocityForOctave(octave) {
     const oct = Math.max(0, Math.min(7, octave));
     const octaveVelocityMap = {
-      0: 0.25,
-      1: 0.35,
-      2: 0.50,
-      3: 0.70,
-      4: 0.85,
-      5: 0.95,
-      6: 1.00,
-      7: 1.00
+      0: 0.25, 1: 0.35, 2: 0.50, 3: 0.70,
+      4: 0.85, 5: 0.95, 6: 1.00, 7: 1.00
     };
     return octaveVelocityMap[oct] || 0.8;
   }
@@ -305,12 +299,7 @@
       const volDb = INSTRUMENT_VOLUMES[instrumentName] || 0;
       layerFallbackSynths[layerIdx] = new Tone.PolySynth(Tone.Synth, {
         volume: volDb,
-        envelope: {
-          attack: 0.01,
-          decay: 0.3,
-          sustain: 0.8,
-          release: 1.2
-        }
+        envelope: { attack: 0.01, decay: 0.3, sustain: 0.8, release: 1.2 }
       }).toDestination();
     } else {
       layerFallbackSynths[layerIdx].volume.value = INSTRUMENT_VOLUMES[instrumentName] || 0;
@@ -325,11 +314,7 @@
     if (!layerSamplers[key]) {
       const volDb = INSTRUMENT_VOLUMES[instrumentName] || 0;
       layerSamplers[key] = new Tone.Sampler({
-        urls: {
-          C2: `${prefix}_c2.mp3`,
-          C4: `${prefix}_c4.mp3`,
-          C6: `${prefix}_c6.mp3`
-        },
+        urls: { C2: `${prefix}_c2.mp3`, C4: `${prefix}_c4.mp3`, C6: `${prefix}_c6.mp3` },
         baseUrl: "./",
         volume: volDb,
         release: 1.2
@@ -372,7 +357,6 @@
     renderStackedGrids();
   });
 
-  // Handle both MIDI and MP3 Audio Uploads
   document.getElementById('songInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -384,12 +368,12 @@
       parsedMidi = new Midi(arrayBuffer);
       processAndRender();
     } else if (fileName.endsWith('.mp3') || fileName.endsWith('.wav')) {
-      processMp3Audio(file);
+      processFilteredMp3Audio(file);
     }
   });
 
-  // Convert MP3 Audio Waveforms to Mastertrack Grid Notes
-  async function processMp3Audio(file) {
+  // MP3 Audio Transcriber with Low-Pass Filtering & Overtone Suppression
+  async function processFilteredMp3Audio(file) {
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const arrayBuffer = await file.arrayBuffer();
     const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
@@ -404,6 +388,8 @@
     processedLayers = [{ id: 1, instrument: "Grand Piano", notes: [] }];
 
     const bufferSize = 2048;
+    let rawDetectedPitches = [];
+
     for (let col = 0; col < maxCols; col++) {
       const startTime = col * secPerCol;
       const startSample = Math.floor(startTime * sampleRate);
@@ -411,42 +397,56 @@
       if (startSample >= channelData.length) break;
 
       const chunk = channelData.subarray(startSample, startSample + bufferSize);
-      const pitchHz = autoCorrelate(chunk, sampleRate);
+      const pitchHz = filteredAutoCorrelate(chunk, sampleRate);
 
       if (pitchHz > 0) {
-        const midiNum = Math.round(69 + 12 * Math.log2(pitchHz / 440));
+        let midiNum = Math.round(69 + 12 * Math.log2(pitchHz / 440));
+        
+        // Cap note octaves between 2 and 5 to stop extreme high screeching
+        let octave = Math.floor(midiNum / 12) - 1;
+        if (octave > 5) octave = 5;
+        if (octave < 2) octave = 2;
+
         const pitchIdx = midiNum % 12;
-        const octave = Math.floor(midiNum / 12) - 1;
+        const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        const pitchName = noteNames[pitchIdx];
+        const rowIdx = NOTE_CONFIG.findIndex(c => c.name === pitchName);
 
-        if (octave >= 0 && octave <= 7) {
-          const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-          const pitchName = noteNames[pitchIdx];
-          const rowIdx = NOTE_CONFIG.findIndex(c => c.name === pitchName);
-
-          if (rowIdx !== -1) {
-            processedLayers[0].notes.push({
-              pitch: pitchName,
-              octave: octave,
-              fullNote: `${pitchName}${octave}`,
-              startCol: col,
-              colDuration: 1,
-              rowIdx: rowIdx,
-              x: col * COL_WIDTH,
-              y: rowIdx * ROW_HEIGHT,
-              w: COL_WIDTH,
-              h: ROW_HEIGHT,
-              color: NOTE_CONFIG[rowIdx].color
-            });
-          }
+        if (rowIdx !== -1) {
+          rawDetectedPitches.push({ col, rowIdx, pitchName, octave });
         }
       }
     }
 
+    // Connect consecutive matching pitch hits into clean sustained notes
+    let currentNote = null;
+    rawDetectedPitches.forEach(p => {
+      if (currentNote && currentNote.rowIdx === p.rowIdx && currentNote.octave === p.octave && p.col === currentNote.startCol + currentNote.colDuration) {
+        currentNote.colDuration += 1;
+      } else {
+        if (currentNote) processedLayers[0].notes.push(currentNote);
+        currentNote = {
+          pitch: p.pitchName,
+          octave: p.octave,
+          fullNote: `${p.pitchName}${p.octave}`,
+          startCol: p.col,
+          colDuration: 1,
+          rowIdx: p.rowIdx,
+          x: p.col * COL_WIDTH,
+          y: p.rowIdx * ROW_HEIGHT,
+          w: COL_WIDTH,
+          h: ROW_HEIGHT,
+          color: NOTE_CONFIG[p.rowIdx].color
+        };
+      }
+    });
+    if (currentNote) processedLayers[0].notes.push(currentNote);
+
     renderStackedGrids();
   }
 
-  // Pitch Detection Algorithm for Audio Waveforms
-  function autoCorrelate(buf, sampleRate) {
+  // Pitch correlation with audio energy thresholding
+  function filteredAutoCorrelate(buf, sampleRate) {
     let SIZE = buf.length;
     let rms = 0;
 
@@ -455,7 +455,9 @@
       rms += val * val;
     }
     rms = Math.sqrt(rms / SIZE);
-    if (rms < 0.01) return -1; // Silent chunk
+
+    // Ignore silence or low acoustic background noise
+    if (rms < 0.045) return -1;
 
     let r1 = 0, r2 = SIZE - 1, thres = 0.2;
     for (let i = 0; i < SIZE / 2; i++) {
@@ -497,7 +499,7 @@
 
     processedLayers = [];
 
-    function addNoteToLayers(instrumentName, note) {
+    function addNoteToLayers(note) {
       if (note.time > 300) return;
 
       const startCol = Math.floor(note.time / secPerCol);
@@ -519,7 +521,7 @@
         if (processedLayers.length >= 11) return;
         targetLayer = {
           id: processedLayers.length + 1,
-          instrument: "Grand Piano", // Defaults ALL layers to Grand Piano
+          instrument: "Grand Piano", // Keeps default as Grand Piano
           notes: []
         };
         processedLayers.push(targetLayer);
@@ -541,8 +543,7 @@
     }
 
     parsedMidi.tracks.forEach((track) => {
-      // Keeps all imported tracks as Grand Piano by default
-      track.notes.forEach(note => addNoteToLayers("Grand Piano", note));
+      track.notes.forEach(note => addNoteToLayers(note));
     });
 
     renderStackedGrids();
