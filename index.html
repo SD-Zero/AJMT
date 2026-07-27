@@ -226,8 +226,8 @@
   let processedLayers = [];
   let layerDrawFunctions = [];
   let isSyncingScroll = false;
-  let samplers = {};
-  let fallbackSynth = null;
+  let layerSamplers = {};
+  let layerFallbackSynths = {};
   let activeEditingNote = null;
   let activeEditingLayerIdx = null;
   let playheadX = -1;
@@ -273,35 +273,45 @@
     return Math.floor((300 * bpm) / 15);
   }
 
-  function getFallbackSynth() {
-    if (!fallbackSynth) {
-      fallbackSynth = new Tone.PolySynth(Tone.Synth).toDestination();
+  function getFallbackSynthForLayer(layerIdx) {
+    if (!layerFallbackSynths[layerIdx]) {
+      layerFallbackSynths[layerIdx] = new Tone.PolySynth(Tone.Synth, {
+        envelope: {
+          attack: 0.01,
+          decay: 0.3,
+          sustain: 0.8,
+          release: 1.2 // Fades out smoothly instead of harsh cut
+        }
+      }).toDestination();
     }
-    return fallbackSynth;
+    return layerFallbackSynths[layerIdx];
   }
 
-  function getSampler(instrumentName) {
+  function getSamplerForLayer(layerIdx, instrumentName) {
     const prefix = SAMPLE_PREFIXES[instrumentName] || "grandpiano";
-    if (!samplers[prefix]) {
-      samplers[prefix] = new Tone.Sampler({
+    const key = `${layerIdx}_${prefix}`;
+
+    if (!layerSamplers[key]) {
+      layerSamplers[key] = new Tone.Sampler({
         urls: {
           C2: `${prefix}_c2.mp3`,
           C4: `${prefix}_c4.mp3`,
           C6: `${prefix}_c6.mp3`
         },
-        baseUrl: "./" // Root directory (no subfolder)
+        baseUrl: "./",
+        release: 1.2 // Smooth fade-out tail for audio files
       }).toDestination();
     }
-    return samplers[prefix];
+    return layerSamplers[key];
   }
 
-  async function playNoteSample(instrumentName, fullNote) {
+  async function playNoteSample(layerIdx, instrumentName, fullNote) {
     await Tone.start();
-    const sampler = getSampler(instrumentName);
+    const sampler = getSamplerForLayer(layerIdx, instrumentName);
     if (sampler && sampler.loaded) {
-      sampler.triggerAttackRelease(fullNote, "8n");
+      sampler.triggerAttackRelease(fullNote, "4n");
     } else {
-      getFallbackSynth().triggerAttackRelease(fullNote, "8n");
+      getFallbackSynthForLayer(layerIdx).triggerAttackRelease(fullNote, "4n");
     }
   }
 
@@ -435,7 +445,7 @@
 
       select.addEventListener('change', (e) => {
         layer.instrument = e.target.value;
-        getSampler(layer.instrument);
+        getSamplerForLayer(layerIdx, layer.instrument);
       });
 
       labelGroup.appendChild(titleSpan);
@@ -500,7 +510,7 @@
           ctx.fillText(b.octave, b.x + 4, b.y + 12);
         });
 
-        // Render Playhead Line
+        // Playhead
         if (playheadX >= 0) {
           ctx.fillStyle = '#ffe66d';
           ctx.fillRect(playheadX, 0, 3, canvas.height);
@@ -512,7 +522,6 @@
       layerDrawFunctions.push(draw);
       draw();
 
-      // Canvas click handling
       canvas.addEventListener('click', (e) => {
         const rect = canvas.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -553,7 +562,7 @@
 
           layer.notes.push(newNote);
           draw();
-          playNoteSample(layer.instrument, fullNote);
+          playNoteSample(layerIdx, layer.instrument, fullNote);
         }
       });
 
@@ -577,9 +586,9 @@
     });
   }
 
-  // Modal Handlers
+  // Modal Controls
   document.getElementById('saveNoteBtn').addEventListener('click', () => {
-    if (activeEditingNote) {
+    if (activeEditingNote && activeEditingLayerIdx !== null) {
       const newOct = parseInt(document.getElementById('editOctave').value) || 4;
       const newDur = Math.max(1, parseInt(document.getElementById('editDuration').value) || 1);
 
@@ -588,7 +597,7 @@
       activeEditingNote.fullNote = `${activeEditingNote.pitch}${activeEditingNote.octave}`;
 
       const layer = processedLayers[activeEditingLayerIdx];
-      if (layer) playNoteSample(layer.instrument, activeEditingNote.fullNote);
+      if (layer) playNoteSample(activeEditingLayerIdx, layer.instrument, activeEditingNote.fullNote);
       redrawAll();
     }
     document.getElementById('inspectorModal').style.display = 'none';
@@ -608,7 +617,7 @@
     document.getElementById('inspectorModal').style.display = 'none';
   });
 
-  // Animated Playhead Loop
+  // Playhead Animation
   function updatePlayhead() {
     if (Tone.Transport.state === "started") {
       const bpm = parseInt(document.getElementById('tempoInput').value) || 175;
@@ -633,7 +642,7 @@
     }
   }
 
-  // Preview Audio Handler
+  // Audio Preview Handler
   document.getElementById('playBtn').addEventListener('click', async () => {
     const playBtn = document.getElementById('playBtn');
 
@@ -647,7 +656,7 @@
 
     await Tone.start();
 
-    processedLayers.forEach(l => getSampler(l.instrument));
+    processedLayers.forEach((l, idx) => getSamplerForLayer(idx, l.instrument));
 
     Tone.Transport.stop();
     Tone.Transport.cancel();
@@ -657,8 +666,8 @@
     Tone.Transport.bpm.value = bpm;
     const secPerCol = 15 / bpm;
 
-    processedLayers.forEach(layer => {
-      const sampler = getSampler(layer.instrument);
+    processedLayers.forEach((layer, layerIdx) => {
+      const sampler = getSamplerForLayer(layerIdx, layer.instrument);
 
       layer.notes.forEach(note => {
         const time = note.startCol * secPerCol;
@@ -667,7 +676,7 @@
           if (sampler && sampler.loaded) {
             sampler.triggerAttackRelease(note.fullNote, dur, t);
           } else {
-            getFallbackSynth().triggerAttackRelease(note.fullNote, dur, t);
+            getFallbackSynthForLayer(layerIdx).triggerAttackRelease(note.fullNote, dur, t);
           }
         }, time);
       });
@@ -681,5 +690,6 @@
 
   renderStackedGrids();
 </script>
+
 </body>
 </html>
