@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Animal Jam Mastertrack Converter</title>
+  <title>Animal Jam Mastertrack Studio</title>
   <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <style>
     :root {
-      --bg-color: #26163b;
-      --card-bg: #372152;
+      --bg-color: #231438;
+      --card-bg: #351f54;
       --accent: #ffe66d;
       --highlight: #4ecdc4;
       --text-main: #f5efff;
@@ -39,24 +39,11 @@
       gap: 12px;
       box-sizing: border-box;
     }
-    h1 {
-      color: var(--accent);
-      margin: 0;
-      font-size: 1.3rem;
-      width: 100%;
-    }
-    .control-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    label {
-      font-size: 0.9rem;
-      color: #d8c7ed;
-      font-weight: 600;
-    }
+    h1 { color: var(--accent); margin: 0; font-size: 1.3rem; width: 100%; }
+    .control-group { display: flex; align-items: center; gap: 8px; }
+    label { font-size: 0.9rem; color: #d8c7ed; font-weight: 600; }
     input[type="number"] {
-      background: #1c0f2e;
+      background: #190b2c;
       color: var(--accent);
       border: 1px solid #5a388a;
       padding: 6px 10px;
@@ -74,15 +61,13 @@
       border-radius: 8px;
       cursor: pointer;
       font-size: 0.9rem;
-      transition: transform 0.1s ease;
     }
-    .btn:active { transform: scale(0.97); }
     .btn:disabled { background: #554466; color: #887799; cursor: not-allowed; }
     input[type="file"] { display: none; }
 
-    /* Redesigned Clean Info Bar */
+    /* Clean Info Bar */
     .inspector-card {
-      background: #321c4a;
+      background: #2e184a;
       border: 1px solid #5d388c;
       border-radius: 10px;
       padding: 12px 20px;
@@ -99,7 +84,7 @@
     }
     .inspector-badge {
       background: var(--accent);
-      color: #26163b;
+      color: #231438;
       padding: 4px 10px;
       border-radius: 6px;
       font-weight: 800;
@@ -108,7 +93,7 @@
       white-space: nowrap;
     }
 
-    /* Container for Stacked Tracks */
+    /* Stacked Track Containers */
     .tracks-container {
       display: flex;
       flex-direction: column;
@@ -116,17 +101,15 @@
       width: 100%;
       max-width: 950px;
     }
-
-    /* Individual Stacked Layer Card */
     .track-card {
-      background: #201133;
+      background: #1c0e30;
       border: 2px solid #4a2d6d;
       border-radius: 10px;
       overflow: hidden;
       box-shadow: 0 6px 16px rgba(0,0,0,0.3);
     }
     .track-header {
-      background: #372152;
+      background: #351f54;
       padding: 8px 15px;
       font-weight: 700;
       font-size: 0.9rem;
@@ -135,51 +118,43 @@
       display: flex;
       justify-content: space-between;
     }
-
-    .grid-wrapper {
-      display: flex;
-      width: 100%;
-    }
+    .grid-wrapper { display: flex; width: 100%; }
     
-    /* Y-Axis Pitch Labels */
+    /* Pitch Labels */
     .pitch-labels {
       display: flex;
       flex-direction: column;
       width: 50px;
-      background: #2b1742;
+      background: #281542;
       border-right: 2px solid #4a2d6d;
       flex-shrink: 0;
     }
     .pitch-label {
-      height: 16px; /* Matching ROW_HEIGHT */
+      height: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 800;
       font-size: 0.7rem;
-      border-bottom: 1px solid rgba(0,0,0,0.15);
       color: #ffffff;
       text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
       box-sizing: border-box;
     }
 
-    /* Scrollable Canvas Area */
+    /* Scrollable Canvas Container */
     .canvas-container {
       flex: 1;
       overflow-x: auto;
       overflow-y: hidden;
-      background: #180c29;
+      background: #140824;
     }
-    canvas {
-      display: block;
-      cursor: pointer;
-    }
+    canvas { display: block; cursor: pointer; }
   </style>
 </head>
 <body>
 
 <div class="controls-card">
-  <h1>Animal Jam Mastertrack Converter</h1>
+  <h1>Animal Jam Mastertrack Studio</h1>
   
   <div class="control-group">
     <button class="btn" onclick="document.getElementById('midiInput').click()">📁 Load MIDI</button>
@@ -197,8 +172,8 @@
 </div>
 
 <div class="inspector-card" id="inspectorCard">
-  <span class="inspector-badge">Info</span>
-  <span id="inspectorText">Load a MIDI file to generate stacked layer tracks...</span>
+  <span class="inspector-badge">Status</span>
+  <span id="inspectorText">Load a MIDI file to display synchronized track layers...</span>
 </div>
 
 <div class="tracks-container" id="tracksContainer"></div>
@@ -207,6 +182,7 @@
   let parsedMidi = null;
   let synth = null;
   let processedLayers = [];
+  let isSyncingScroll = false;
 
   // AJ Pitch Colors (B down to C)
   const NOTE_CONFIG = [
@@ -224,14 +200,20 @@
     { name: 'C',  color: '#ff0000' }  // Bright Red
   ];
 
-  // Cell Dimensions (Wider horizontal rectangles)
-  const ROW_HEIGHT = 16; 
-  const COL_WIDTH = 28;  
+  // Official AJ Instruments mapping
+  const AJ_INSTRUMENTS = [
+    "Grand Piano", "Simple Piano", "Bass", "Chip Synth", 
+    "Drum Kit", "Chirping Bells", "Gritty Brass", 
+    "Sunny Synth", "Harp", "Gentle Brass"
+  ];
+
+  const ROW_HEIGHT = 16;
+  const COL_WIDTH = 28;
 
   function getMaxColumns() {
     let bpm = parseInt(document.getElementById('tempoInput').value) || 175;
     bpm = Math.max(65, Math.min(240, bpm));
-    return Math.floor((300 * bpm) / 15); // 5 min cap
+    return Math.floor((300 * bpm) / 15);
   }
 
   document.getElementById('tempoInput').addEventListener('change', () => {
@@ -258,9 +240,8 @@
 
     processedLayers = [];
 
-    // Helper: Find or create an available layer for an instrument
     function addNoteToLayers(instrumentName, note) {
-      if (note.time > 300) return; // 5-minute limit cutoff
+      if (note.time > 300) return;
 
       const startCol = Math.floor(note.time / secPerCol);
       const colDuration = Math.max(1, Math.round(note.duration / secPerCol));
@@ -270,19 +251,17 @@
       const rowIdx = NOTE_CONFIG.findIndex(c => c.name === pitchName);
       if (rowIdx === -1) return;
 
-      // Check existing layers matching this instrument for overlapping notes
+      // Check for non-overlapping layer
       let targetLayer = processedLayers.find(layer => {
         if (layer.instrument !== instrumentName) return false;
-        // Verify no note already occupies this cell position
         return !layer.notes.some(n => 
           n.rowIdx === rowIdx && 
           !(startCol + colDuration <= n.startCol || startCol >= n.startCol + n.colDuration)
         );
       });
 
-      // Create new layer if occupied or none exists (up to 11 layers max)
       if (!targetLayer) {
-        if (processedLayers.length >= 11) return; // Enforce AJ 11 layer ceiling
+        if (processedLayers.length >= 11) return; // Hard 11 layer cap
         targetLayer = {
           id: processedLayers.length + 1,
           instrument: instrumentName,
@@ -306,38 +285,34 @@
       });
     }
 
-    // Process all tracks & notes
     parsedMidi.tracks.forEach((track, idx) => {
-      const instName = track.instrument ? track.instrument.name : `Instrument ${idx + 1}`;
-      track.notes.forEach(note => addNoteToLayers(instName, note));
+      // Map MIDI instruments to nearest official AJ Instrument
+      const mappedInst = AJ_INSTRUMENTS[idx % AJ_INSTRUMENTS.length];
+      track.notes.forEach(note => addNoteToLayers(mappedInst, note));
     });
 
     renderStackedGrids(maxCols);
-
     document.getElementById('inspectorText').innerText = 
-      `Processed ${processedLayers.length} Layer(s) | Tempo: ${bpm} BPM | Grid Limit: ${maxCols} Columns`;
+      `Rendered ${processedLayers.length} Layer(s) | Synchronized Timeline Active | Tempo: ${bpm} BPM`;
   }
 
   function renderStackedGrids(maxCols) {
     const container = document.getElementById('tracksContainer');
     container.innerHTML = '';
+    const scrollContainers = [];
 
     processedLayers.forEach((layer, layerIdx) => {
-      // Create Layer Card Container
       const card = document.createElement('div');
       card.className = 'track-card';
 
-      // Header
       const header = document.createElement('div');
       header.className = 'track-header';
       header.innerHTML = `<span>Layer ${layerIdx + 1}: ${layer.instrument}</span><span>${layer.notes.length} Notes</span>`;
       card.appendChild(header);
 
-      // Wrapper
       const gridWrapper = document.createElement('div');
       gridWrapper.className = 'grid-wrapper';
 
-      // Left Labels
       const pitchLabels = document.createElement('div');
       pitchLabels.className = 'pitch-labels';
       NOTE_CONFIG.forEach(cfg => {
@@ -349,29 +324,25 @@
       });
       gridWrapper.appendChild(pitchLabels);
 
-      // Scrollable Canvas Area
       const canvasContainer = document.createElement('div');
       canvasContainer.className = 'canvas-container';
+      scrollContainers.push(canvasContainer);
 
       const canvas = document.createElement('canvas');
       canvas.width = maxCols * COL_WIDTH;
       canvas.height = 12 * ROW_HEIGHT;
-
       const ctx = canvas.getContext('2d');
 
-      // 1. Draw Checkered Background Grid (Horizontal Rectangles)
+      // 1. Draw Background Checkered Grid WITHOUT distracting cell borders
       for (let col = 0; col < maxCols; col++) {
         for (let row = 0; row < 12; row++) {
           const isDark = (col + row) % 2 === 0;
           ctx.fillStyle = isDark ? '#1a0e2e' : '#23133d';
           ctx.fillRect(col * COL_WIDTH, row * ROW_HEIGHT, COL_WIDTH, ROW_HEIGHT);
-
-          ctx.strokeStyle = '#2d184d';
-          ctx.strokeRect(col * COL_WIDTH, row * ROW_HEIGHT, COL_WIDTH, ROW_HEIGHT);
         }
       }
 
-      // 2. Draw Note Blocks for this Layer
+      // 2. Render Clean Note Blocks with crisp outlines
       layer.notes.forEach(b => {
         ctx.fillStyle = b.color;
         ctx.fillRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
@@ -381,7 +352,7 @@
         ctx.strokeRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
       });
 
-      // Click event for details
+      // Click event for note inspection
       canvas.addEventListener('click', (e) => {
         const rect = canvas.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -394,7 +365,7 @@
 
         if (hit) {
           document.getElementById('inspectorText').innerText = 
-            `Layer ${layerIdx + 1} (${layer.instrument})  ➔  Note: ${hit.fullNote} (Octave ${hit.octave})  |  Column Start: ${hit.startCol + 1}  |  Block Length: ${hit.colDuration} cell(s)`;
+            `Layer ${layerIdx + 1} (${layer.instrument})  ➔  Note: ${hit.fullNote} (Octave ${hit.octave})  |  Start Column: ${hit.startCol + 1}  |  Length: ${hit.colDuration} block(s)`;
         }
       });
 
@@ -403,9 +374,23 @@
       card.appendChild(gridWrapper);
       container.appendChild(card);
     });
+
+    // Synchronize horizontal scrolling across ALL layer canvases simultaneously
+    scrollContainers.forEach(targetContainer => {
+      targetContainer.addEventListener('scroll', () => {
+        if (!isSyncingScroll) {
+          isSyncingScroll = true;
+          const scrollPos = targetContainer.scrollLeft;
+          scrollContainers.forEach(c => {
+            if (c !== targetContainer) c.scrollLeft = scrollPos;
+          });
+          isSyncingScroll = false;
+        }
+      });
+    });
   }
 
-  // Audio Preview
+  // Audio Playback
   document.getElementById('playBtn').addEventListener('click', async () => {
     await Tone.start();
     if (!synth) synth = new Tone.PolySynth(Tone.Synth).toDestination();
