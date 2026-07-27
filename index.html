@@ -3,156 +3,233 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Animal Jam Mastertrack Converter</title>
+  <title>Animal Jam Mastertrack Studio</title>
   <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <style>
+    :root {
+      --bg-color: #1e1329;
+      --card-bg: #2b1d38;
+      --accent: #ffe66d;
+      --highlight: #4ecdc4;
+    }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #2b1d38;
+      background-color: var(--bg-color);
       color: #ffffff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
       margin: 0;
       padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
-    .card {
-      background: #3c2a4d;
-      padding: 30px;
-      border-radius: 16px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
-      max-width: 500px;
-      width: 100%;
-      text-align: center;
-    }
-    h1 { color: #ffe66d; margin-bottom: 8px; }
-    p { color: #d0c2e0; font-size: 0.95rem; }
-    .upload-box {
-      border: 2px dashed #ffe66d;
+    .header-card {
+      background: var(--card-bg);
       padding: 20px;
       border-radius: 12px;
-      margin: 20px 0;
-      background: #322242;
-      cursor: pointer;
+      max-width: 900px;
+      width: 100%;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+      margin-bottom: 20px;
+      text-align: center;
     }
-    input[type="file"] { display: none; }
+    h1 { color: var(--accent); margin-top: 0; }
     .btn {
-      background: #4ecdc4;
-      color: #1a2625;
+      background: var(--highlight);
+      color: #121e1d;
       border: none;
-      padding: 12px 24px;
+      padding: 10px 18px;
       font-weight: bold;
-      border-radius: 8px;
+      border-radius: 6px;
       cursor: pointer;
-      margin: 8px;
-      font-size: 1rem;
+      margin: 5px;
+      font-size: 0.95rem;
     }
-    .btn:disabled { background: #666; cursor: not-allowed; }
-    .status-log {
-      background: #1e1329;
-      padding: 12px;
+    .btn:disabled { background: #555; color: #888; cursor: not-allowed; }
+    input[type="file"] { display: none; }
+
+    /* Inspector Display Bar */
+    .inspector-bar {
+      background: #12091c;
+      border: 1px solid var(--accent);
       border-radius: 8px;
-      text-align: left;
-      font-family: monospace;
-      font-size: 0.85rem;
-      max-height: 150px;
-      overflow-y: auto;
+      padding: 12px;
       margin-top: 15px;
-      color: #a0f0d0;
+      font-family: monospace;
+      color: var(--accent);
+      min-height: 24px;
+    }
+
+    /* Piano Roll Horizontal Scroll Container */
+    .visualizer-container {
+      width: 100%;
+      max-width: 900px;
+      background: #160c21;
+      border-radius: 12px;
+      border: 1px solid #3c2a4d;
+      overflow-x: auto;
+      overflow-y: hidden;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+    }
+    .roll-canvas {
+      display: block;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
 
-<div class="card">
-  <h1>AJ Mastertrack Tool</h1>
-  <p>Converts messy MIDI files to match Animal Jam limits.</p>
+<div class="header-card">
+  <h1>AJ Mastertrack Visualizer</h1>
+  <button class="btn" onclick="document.getElementById('midiInput').click()">📁 Load MIDI</button>
+  <button id="playBtn" class="btn" disabled>▶ Play</button>
+  <button id="downloadBtn" class="btn" disabled>💾 Export MIDI</button>
 
-  <div class="upload-box" onclick="document.getElementById('midiInput').click()">
-    <span id="uploadLabel">📁 Tap to upload messy MIDI</span>
-    <input type="file" id="midiInput" accept=".mid,.midi">
+  <input type="file" id="midiInput" accept=".mid,.midi">
+
+  <div class="inspector-bar" id="inspector">
+    Tap/Click any note block in the timeline to view details...
   </div>
+</div>
 
-  <button id="playBtn" class="btn" disabled>▶ Preview Audio</button>
-  <button id="downloadBtn" class="btn" disabled>💾 Export Clean MIDI</button>
-
-  <div class="status-log" id="statusLog">Status: Waiting for file...</div>
+<div class="visualizer-container" id="visualContainer">
+  <canvas id="rollCanvas" class="roll-canvas"></canvas>
 </div>
 
 <script>
   let parsedMidi = null;
   let synth = null;
+  let interactiveNotes = [];
 
-  // Animal Jam Game Rules
-  const MAX_TIME_SECONDS = 300; // 5 Minutes max
-  const MAX_LAYERS = 11;        // Max 11 tracks
-  const MIN_NOTE = 12;          // C0
-  const MAX_NOTE = 96;          // C7
+  // Track Colors (Up to 11 AJ Layers)
+  const TRACK_COLORS = [
+    '#ff6b6b', '#4ecdc4', '#ffe66d', '#1a535c', '#f7fff7',
+    '#ff9f1c', '#2ec4b6', '#e71d36', '#ff99c8', '#fcf6bd', '#d0f4de'
+  ];
 
-  function log(msg) {
-    const logBox = document.getElementById('statusLog');
-    logBox.innerHTML += `<br>[*] ${msg}`;
-    logBox.scrollTop = logBox.scrollHeight;
-  }
+  // Game Limits
+  const MAX_TIME_SECONDS = 300;
+  const MAX_LAYERS = 11;
+  const MIN_NOTE = 12;
+  const MAX_NOTE = 96;
 
   document.getElementById('midiInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    document.getElementById('uploadLabel').innerText = file.name;
-    log(`Loading file: ${file.name}`);
-
     const arrayBuffer = await file.arrayBuffer();
     parsedMidi = new Midi(arrayBuffer);
 
-    cleanMidiForAnimalJam();
+    cleanAndRender();
   });
 
-  function cleanMidiForAnimalJam() {
+  function cleanAndRender() {
     if (!parsedMidi) return;
 
-    log("Applying Animal Jam rule set...");
-
-    // Rule 1: Limit to 11 Sound Layers
+    // Enforce 11 Layers Cap
     if (parsedMidi.tracks.length > MAX_LAYERS) {
-      log(`Track limit exceeded! Truncated from ${parsedMidi.tracks.length} to 11 tracks.`);
       parsedMidi.tracks = parsedMidi.tracks.slice(0, MAX_LAYERS);
     }
 
-    parsedMidi.tracks.forEach((track, index) => {
-      // Rule 2 & 3: Filter 5-minute cap and clamp note pitch (C0 - C7)
-      track.notes = track.notes.filter(note => {
-        return note.time <= MAX_TIME_SECONDS; // Delete notes past 5 minutes
-      }).map(note => {
-        // Clamp octave pitch
+    interactiveNotes = [];
+
+    // Clean notes and build hitboxes
+    parsedMidi.tracks.forEach((track, trackIndex) => {
+      const instrumentName = track.instrument ? track.instrument.name : `AJ Layer ${trackIndex + 1}`;
+      
+      track.notes = track.notes.filter(n => n.time <= MAX_TIME_SECONDS).map(note => {
+        // Clamp & Quantize
         if (note.midi < MIN_NOTE) note.midi = MIN_NOTE;
         if (note.midi > MAX_NOTE) note.midi = MAX_NOTE;
-
-        // Rule 4: Grid Quantization (16th note snap)
         note.time = Math.round(note.time * 4) / 4;
-        note.duration = Math.max(0.1, Math.round(note.duration * 4) / 4);
+        note.duration = Math.max(0.125, Math.round(note.duration * 4) / 4);
 
         return note;
       });
+
+      // Prepare notes for canvas rendering
+      track.notes.forEach(note => {
+        interactiveNotes.push({
+          trackIndex: trackIndex,
+          instrument: instrumentName,
+          name: note.name,
+          octave: note.octave,
+          pitch: note.midi,
+          time: note.time,
+          duration: note.duration
+        });
+      });
     });
 
-    log("✓ Cleanup complete! File ready.");
+    drawPianoRoll();
+    
     document.getElementById('playBtn').disabled = false;
     document.getElementById('downloadBtn').disabled = false;
+    document.getElementById('inspector').innerText = "MIDI loaded! Scroll horizontally to view sequence.";
   }
 
-  // Audio Preview Setup
-  document.getElementById('playBtn').addEventListener('click', async () => {
-    await Tone.start();
+  function drawPianoRoll() {
+    const canvas = document.getElementById('rollCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Scale sizing: 1 second = 50 pixels horizontally
+    const pxPerSecond = 50;
+    const maxDuration = Math.min(MAX_TIME_SECONDS, parsedMidi.duration || 60);
     
-    if (!synth) {
-      synth = new Tone.PolySynth(Tone.Synth).toDestination();
+    canvas.width = Math.max(900, maxDuration * pxPerSecond);
+    canvas.height = 300;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Grid Lines (1-second intervals)
+    ctx.strokeStyle = '#231633';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += pxPerSecond) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
     }
 
+    // Render Note Blocks
+    interactiveNotes.forEach(n => {
+      const x = n.time * pxPerSecond;
+      const y = canvas.height - ((n.pitch - MIN_NOTE) / (MAX_NOTE - MIN_NOTE) * canvas.height);
+      const width = Math.max(6, n.duration * pxPerSecond);
+      const height = 6;
+
+      // Save hitbox for clicking
+      n.hitbox = { x, y: y - height, w: width, h: height };
+
+      ctx.fillStyle = TRACK_COLORS[n.trackIndex % TRACK_COLORS.length];
+      ctx.fillRect(x, y - height, width, height);
+    });
+  }
+
+  // Handle Note Click / Tap Inspector
+  document.getElementById('rollCanvas').addEventListener('click', (e) => {
+    const canvas = document.getElementById('rollCanvas');
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const hit = interactiveNotes.find(n => {
+      return clickX >= n.hitbox.x && clickX <= (n.hitbox.x + n.hitbox.w) &&
+             clickY >= n.hitbox.y && clickY <= (n.hitbox.y + n.hitbox.h);
+    });
+
+    if (hit) {
+      document.getElementById('inspector').innerText = 
+        `Layer: ${hit.trackIndex + 1} (${hit.instrument}) | Note: ${hit.name} | Octave: ${hit.octave} | Duration: ${hit.duration.toFixed(2)}s | Start: ${hit.time.toFixed(2)}s`;
+    }
+  });
+
+  // Audio Playback
+  document.getElementById('playBtn').addEventListener('click', async () => {
+    await Tone.start();
+    if (!synth) synth = new Tone.PolySynth(Tone.Synth).toDestination();
+
     Tone.Transport.cancel();
-    
     parsedMidi.tracks.forEach(track => {
       track.notes.forEach(note => {
         Tone.Transport.schedule((time) => {
@@ -160,22 +237,16 @@
         }, note.time);
       });
     });
-
     Tone.Transport.start();
-    log("Playing preview...");
   });
 
-  // Export File
+  // Download
   document.getElementById('downloadBtn').addEventListener('click', () => {
-    const midiArray = parsedMidi.toArray();
-    const blob = new Blob([midiArray], { type: 'audio/midi' });
-    const url = URL.createObjectURL(blob);
-    
+    const blob = new Blob([parsedMidi.toArray()], { type: 'audio/midi' });
     const a = document.createElement('a');
-    a.href = url;
-    a.download = 'aj_ready_mastertrack.mid';
+    a.href = URL.createObjectURL(blob);
+    a.download = 'aj_mastertrack.mid';
     a.click();
-    log("Downloaded clean MIDI!");
   });
 </script>
 
