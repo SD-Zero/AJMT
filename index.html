@@ -178,8 +178,8 @@
   <h1>Animal Jam Mastertrack Studio</h1>
   
   <div class="control-group">
-    <button class="btn" onclick="document.getElementById('midiInput').click()">📁 Load Song</button>
-    <input type="file" id="midiInput" accept=".mid,.midi">
+    <button class="btn" onclick="document.getElementById('songInput').click()">📁 Load MIDI / MP3</button>
+    <input type="file" id="songInput" accept=".mid,.midi,.mp3,.wav">
   </div>
 
   <div class="control-group">
@@ -233,18 +233,18 @@
   let playheadX = -1;
 
   const NOTE_CONFIG = [
-    { name: 'B',  color: '#ff1493' },
-    { name: 'A#', color: '#8a2be2' },
-    { name: 'A',  color: '#0033cc' },
-    { name: 'G#', color: '#0074d9' },
-    { name: 'G',  color: '#00f3ff' },
-    { name: 'F#', color: '#008080' },
-    { name: 'F',  color: '#00ff00' },
-    { name: 'E',  color: '#32cd32' },
-    { name: 'D#', color: '#ffd700' },
-    { name: 'D',  color: '#ff7f00' },
-    { name: 'C#', color: '#ff4500' },
-    { name: 'C',  color: '#ff0000' }
+    { name: 'B',  color: '#ff1493', semitone: 11 },
+    { name: 'A#', color: '#8a2be2', semitone: 10 },
+    { name: 'A',  color: '#0033cc', semitone: 9 },
+    { name: 'G#', color: '#0074d9', semitone: 8 },
+    { name: 'G',  color: '#00f3ff', semitone: 7 },
+    { name: 'F#', color: '#008080', semitone: 6 },
+    { name: 'F',  color: '#00ff00', semitone: 5 },
+    { name: 'E',  color: '#32cd32', semitone: 4 },
+    { name: 'D#', color: '#ffd700', semitone: 3 },
+    { name: 'D',  color: '#ff7f00', semitone: 2 },
+    { name: 'C#', color: '#ff4500', semitone: 1 },
+    { name: 'C',  color: '#ff0000', semitone: 0 }
   ];
 
   const AJ_INSTRUMENTS = [
@@ -264,7 +264,6 @@
     "Gentle Brass": "gentlebrass"
   };
 
-  // Base Volume Adjustments (dB) per instrument to equalize overall mix
   const INSTRUMENT_VOLUMES = {
     "Grand Piano": 0,
     "Simple Piano": -1,
@@ -286,7 +285,6 @@
     return Math.floor((300 * bpm) / 15);
   }
 
-  // Calculates velocity (0.25 to 1.0) based on octave to recreate AJ's quieter low notes
   function getVelocityForOctave(octave) {
     const oct = Math.max(0, Math.min(7, octave));
     const octaveVelocityMap = {
@@ -368,20 +366,127 @@
     }
     processedLayers.push({
       id: processedLayers.length + 1,
-      instrument: AJ_INSTRUMENTS[processedLayers.length % AJ_INSTRUMENTS.length],
+      instrument: "Grand Piano",
       notes: []
     });
     renderStackedGrids();
   });
 
-  document.getElementById('midiInput').addEventListener('change', async (e) => {
+  // Handle both MIDI and MP3 Audio Uploads
+  document.getElementById('songInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const arrayBuffer = await file.arrayBuffer();
-    parsedMidi = new Midi(arrayBuffer);
-    processAndRender();
+    const fileName = file.name.toLowerCase();
+
+    if (fileName.endsWith('.mid') || fileName.endsWith('.midi')) {
+      const arrayBuffer = await file.arrayBuffer();
+      parsedMidi = new Midi(arrayBuffer);
+      processAndRender();
+    } else if (fileName.endsWith('.mp3') || fileName.endsWith('.wav')) {
+      processMp3Audio(file);
+    }
   });
+
+  // Convert MP3 Audio Waveforms to Mastertrack Grid Notes
+  async function processMp3Audio(file) {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await file.arrayBuffer();
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+    const bpm = parseInt(document.getElementById('tempoInput').value) || 175;
+    const secPerCol = 15 / bpm;
+    const maxCols = getMaxColumns();
+
+    const channelData = audioBuffer.getChannelData(0);
+    const sampleRate = audioBuffer.sampleRate;
+    
+    processedLayers = [{ id: 1, instrument: "Grand Piano", notes: [] }];
+
+    const bufferSize = 2048;
+    for (let col = 0; col < maxCols; col++) {
+      const startTime = col * secPerCol;
+      const startSample = Math.floor(startTime * sampleRate);
+
+      if (startSample >= channelData.length) break;
+
+      const chunk = channelData.subarray(startSample, startSample + bufferSize);
+      const pitchHz = autoCorrelate(chunk, sampleRate);
+
+      if (pitchHz > 0) {
+        const midiNum = Math.round(69 + 12 * Math.log2(pitchHz / 440));
+        const pitchIdx = midiNum % 12;
+        const octave = Math.floor(midiNum / 12) - 1;
+
+        if (octave >= 0 && octave <= 7) {
+          const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+          const pitchName = noteNames[pitchIdx];
+          const rowIdx = NOTE_CONFIG.findIndex(c => c.name === pitchName);
+
+          if (rowIdx !== -1) {
+            processedLayers[0].notes.push({
+              pitch: pitchName,
+              octave: octave,
+              fullNote: `${pitchName}${octave}`,
+              startCol: col,
+              colDuration: 1,
+              rowIdx: rowIdx,
+              x: col * COL_WIDTH,
+              y: rowIdx * ROW_HEIGHT,
+              w: COL_WIDTH,
+              h: ROW_HEIGHT,
+              color: NOTE_CONFIG[rowIdx].color
+            });
+          }
+        }
+      }
+    }
+
+    renderStackedGrids();
+  }
+
+  // Pitch Detection Algorithm for Audio Waveforms
+  function autoCorrelate(buf, sampleRate) {
+    let SIZE = buf.length;
+    let rms = 0;
+
+    for (let i = 0; i < SIZE; i++) {
+      let val = buf[i];
+      rms += val * val;
+    }
+    rms = Math.sqrt(rms / SIZE);
+    if (rms < 0.01) return -1; // Silent chunk
+
+    let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+    for (let i = 0; i < SIZE / 2; i++) {
+      if (Math.abs(buf[i]) < thres) { r1 = i; break; }
+    }
+    for (let i = 1; i < SIZE / 2; i++) {
+      if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
+    }
+
+    buf = buf.slice(r1, r2);
+    SIZE = buf.length;
+
+    let c = new Array(SIZE).fill(0);
+    for (let i = 0; i < SIZE; i++) {
+      for (let j = 0; j < SIZE - i; j++) {
+        c[i] = c[i] + buf[j] * buf[j + i];
+      }
+    }
+
+    let d = 0;
+    while (c[d] > c[d + 1]) d++;
+    let maxval = -1, maxpos = -1;
+    for (let i = d; i < SIZE; i++) {
+      if (c[i] > maxval) {
+        maxval = c[i];
+        maxpos = i;
+      }
+    }
+    let T0 = maxpos;
+    return sampleRate / T0;
+  }
 
   function processAndRender() {
     if (!parsedMidi) return;
@@ -404,7 +509,6 @@
       if (rowIdx === -1) return;
 
       let targetLayer = processedLayers.find(layer => {
-        if (layer.instrument !== instrumentName) return false;
         return !layer.notes.some(n => 
           n.rowIdx === rowIdx && 
           !(startCol + colDuration <= n.startCol || startCol >= n.startCol + n.colDuration)
@@ -415,7 +519,7 @@
         if (processedLayers.length >= 11) return;
         targetLayer = {
           id: processedLayers.length + 1,
-          instrument: instrumentName,
+          instrument: "Grand Piano", // Defaults ALL layers to Grand Piano
           notes: []
         };
         processedLayers.push(targetLayer);
@@ -436,9 +540,9 @@
       });
     }
 
-    parsedMidi.tracks.forEach((track, idx) => {
-      const inst = AJ_INSTRUMENTS[idx % AJ_INSTRUMENTS.length];
-      track.notes.forEach(note => addNoteToLayers(inst, note));
+    parsedMidi.tracks.forEach((track) => {
+      // Keeps all imported tracks as Grand Piano by default
+      track.notes.forEach(note => addNoteToLayers("Grand Piano", note));
     });
 
     renderStackedGrids();
@@ -521,7 +625,6 @@
       function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Grid Background
         for (let col = 0; col < maxCols; col++) {
           for (let row = 0; row < 12; row++) {
             const isDark = (col + row) % 2 === 0;
@@ -530,7 +633,6 @@
           }
         }
 
-        // Render Notes
         layer.notes.forEach(b => {
           b.x = b.startCol * COL_WIDTH;
           b.w = b.colDuration * COL_WIDTH;
@@ -547,7 +649,6 @@
           ctx.fillText(b.octave, b.x + 4, b.y + 12);
         });
 
-        // Playhead
         if (playheadX >= 0) {
           ctx.fillStyle = '#ffe66d';
           ctx.fillRect(playheadX, 0, 3, canvas.height);
@@ -728,4 +829,7 @@
   });
 
   renderStackedGrids();
-</script></body></html>
+</script>
+
+</body>
+</html>
