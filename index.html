@@ -8,13 +8,12 @@
       :root{
         --bg:#242424; /* requested background */
         --grid:#2D2D2D; /* grid lines */
-        --topbar: rgba(24,24,24,0.78); /* slightly darker, semi-transparent (darker than before but lighter than buttons) */
+        --topbar: rgba(24,24,24,0.78); /* topbar color (darker than background, lighter than buttons) */
         --circle:#0d0d0d; /* very dark buttons */
         --icon:#bfbfbf; /* muted light gray icon */
         --gap:12px;
         --topbar-height:44px; /* slim bar */
-        --frame-inset:12px; /* inset for outer border to emulate device rounding */
-        --frame-radius:34px; /* curvature approximating iPad corners */
+        --frame-radius:40px; /* default radius, will be recalculated by JS */
       }
 
       /* Full window background with a small square grid using CSS gradients */
@@ -35,42 +34,34 @@
       /* Device frame: thin border around the whole viewport with rounded corners to match iPad curvature */
       .device-frame{
         position:fixed;
-        left:var(--frame-inset);
-        right:var(--frame-inset);
-        top:var(--frame-inset);
-        bottom:var(--frame-inset);
-        border:1px solid var(--grid);
+        left:0;right:0;top:0;bottom:0;
+        border:2px solid var(--grid);
         border-radius:var(--frame-radius);
         pointer-events:none; /* don't block clicks */
         box-sizing:border-box;
       }
 
-      /* Topbar: flush to top/left/right inside the device frame; sleeker height, controlled blur, no shadows or radius */
+      /* Topbar: flush to the very top, full width, no floating inset; slim and simple */
       .topbar{
         height:var(--topbar-height);
         display:flex;
         align-items:center;
         gap:var(--gap);
-        /* place topbar exactly at device-frame's top edge visually by matching inset */
-        position:fixed;
-        left:var(--frame-inset);
-        right:var(--frame-inset);
-        top:var(--frame-inset);
         padding:0 18px;
         background:var(--topbar);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
-        border:1px solid var(--grid); /* border around topbar that matches grid color */
-        border-bottom:none; /* avoid double border at bottom since device frame exists */
+        position:fixed;
+        left:0;right:0;top:0;
         box-sizing:border-box;
+        border-bottom:1px solid var(--grid); /* bottom line same color as grid */
+        border-top-left-radius:var(--frame-radius);
+        border-top-right-radius:var(--frame-radius);
+        overflow:hidden;
       }
 
-      /* To avoid an extra line between topbar and frame, draw a top-only border on frame, so we keep a consistent outline */
-      .device-frame::before{
-        content: '';
-        position: absolute;
-        left:0;right:0;top:0;height:0; /* placeholder to ensure stacking */
-      }
+      /* Remove any floating appearance — topbar sits flush against the frame edges */
+      .topbar::before{content:'';display:block;height:0}
 
       .topbar-left{display:flex;align-items:center;gap:12px}
 
@@ -99,18 +90,19 @@
       .topbar-spacer{flex:1}
 
       /* Keep the content area fixed and not scrollable */
-      main{position:fixed;left:var(--frame-inset);right:var(--frame-inset);top:calc(var(--frame-inset) + var(--topbar-height));bottom:var(--frame-inset);overflow:hidden}
+      main{position:fixed;left:0;right:0;top:var(--topbar-height);bottom:0;overflow:hidden}
 
-      /* optional: center placeholder area visually for future canvas */
+      /* placeholder area for canvas */
       .canvas-placeholder{height:100%;display:flex;align-items:center;justify-content:center;color:#bdbdbd}
 
-      /* accessibility focus state (no shadows) */
-      .icon-circle:focus{box-shadow:0 0 0 2px rgba(255,255,255,0.06)}
+      /* accessibility focus state (subtle) */
+      .icon-circle:focus{outline:2px solid rgba(191,191,191,0.08)}
 
     </style>
   </head>
   <body>
 
+    <!-- full-viewport frame; JS will calculate --frame-radius to better match device shape -->
     <div class="device-frame" aria-hidden="true"></div>
 
     <div class="topbar" role="banner">
@@ -118,7 +110,7 @@
         <div class="gallery-label">Gallery</div>
 
         <div class="icon-row" aria-hidden="false">
-          <!-- Wrench / settings icon (filled, minimal) -->
+          <!-- Wrench / settings icon -->
           <button class="icon-circle" title="Wrench" aria-label="Wrench">
             <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M21.5 14.8l-3.6-3.6a6.1 6.1 0 0 0 .2-1.2 6.1 6.1 0 0 0-6.1-6.1c-.4 0-.8.05-1.2.15L6.4 1.6 4.6 3.4l3.9 3.9c-.1.4-.15.8-.15 1.2 0 3 2.5 5.5 5.5 5.5.4 0 .8-.05 1.2-.15l3.9 3.9 1.8-1.8-3.1-3.1z"/>
@@ -132,7 +124,7 @@
             </svg>
           </button>
 
-          <!-- S-shaped ribbon icon (stylized S) -->
+          <!-- S-shaped ribbon icon -->
           <button class="icon-circle" title="Ribbon" aria-label="Ribbon">
             <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M6 6c2.2 0 3 1.7 5 1.7s2.8-1.7 5-1.7v2c-2.2 0-3 1.7-5 1.7s-2.8-1.7-5-1.7V6zM6 15c2.2 0 3-1.7 5-1.7s2.8 1.7 5 1.7v-2c-2.2 0-3-1.7-5-1.7s-2.8 1.7-5 1.7v2z"/>
@@ -150,7 +142,6 @@
 
       <div class="topbar-spacer"></div>
 
-      <!-- right side kept empty intentionally -->
       <div aria-hidden="true" style="opacity:0.6;font-size:13px;padding-right:18px">&nbsp;</div>
     </div>
 
@@ -158,5 +149,19 @@
       <div class="canvas-placeholder">Canvas area (to be added)</div>
     </main>
 
+    <script>
+      // Calculate frame radius dynamically from viewport to better match device curvature on iPad-sized screens
+      function updateFrameRadius() {
+        const minDim = Math.min(window.innerWidth, window.innerHeight);
+        // Use a percentage of the smaller dimension; tweak factor as needed
+        const radius = Math.max(18, Math.round(minDim * 0.05));
+        document.documentElement.style.setProperty('--frame-radius', radius + 'px');
+      }
+      window.addEventListener('resize', updateFrameRadius);
+      updateFrameRadius();
+
+      // Ensure topbar is not inset or floating — keep it flush
+      // No-op: CSS positions topbar at the very top; script left intentionally minimal
+    </script>
   </body>
 </html>
