@@ -1,576 +1,129 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Procreate-like Studio</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Procreate - Mockup</title>
     <style>
-      :root {
-        --bg: #111214;
-        --panel: rgba(28, 29, 32, 0.9);
-        --panel-2: rgba(41, 43, 47, 0.9);
-        --panel-3: rgba(24, 25, 29, 0.95);
-        --toolbar: rgba(15, 16, 18, 0.96);
-        --muted: #8b8f98;
-        --text: #f3f4f7;
-        --line: rgba(255,255,255,0.07);
-        --shadow: rgba(0,0,0,0.42);
-        --accent: #f8c75c;
-        --accent-2: #dd8d63;
-        --canvas-bg: #fcf9f2;
-        --canvas-shadow: rgba(0,0,0,0.45);
+      :root{
+        --bg:#242424; /* requested background */
+        --grid:#2D2D2D; /* grid lines */
+        --topbar: rgba(30,30,30,0.55); /* slightly darker, transparent */
+        --topbar-border: rgba(0,0,0,0.35);
+        --circle:#2b2b2b; /* dark gray circle */
+        --icon:#cfcfcf; /* light gray icon */
+        --gap:12px;
       }
 
-      * { box-sizing: border-box; }
-
-      html, body {
-        margin: 0;
-        height: 100%;
-        background:
-          radial-gradient(circle at 20% 15%, rgba(255,255,255,0.08), transparent 20%),
-          linear-gradient(180deg, #0d0e10 0%, #17191d 100%);
-        color: var(--text);
-        font-family: Inter, "SF Pro Display", "Segoe UI", sans-serif;
+      /* Full window background with a small square grid using CSS gradients */
+      html,body{height:100%;margin:0}
+      body{
+        background-color:var(--bg);
+        /* small 16px grid */
+        background-image:
+          linear-gradient(to right, var(--grid) 1px, transparent 1px),
+          linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+        background-size:16px 16px;
+        -webkit-font-smoothing:antialiased;
+        -moz-osx-font-smoothing:grayscale;
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+        color: #fff;
       }
 
-      body {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
+      .topbar{
+        height:64px;
+        display:flex;
+        align-items:center;
+        gap:var(--gap);
+        padding:0 20px;
+        /* slightly darker + translucent with blur */
+        background:var(--topbar);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        border-bottom:1px solid var(--topbar-border);
+        position:fixed;
+        left:24px;right:24px;top:24px;
+        border-radius:12px;
+        box-shadow:0 6px 18px rgba(0,0,0,0.45);
       }
 
-      .app {
-        width: min(1440px, 100%);
-        height: min(900px, calc(100vh - 36px));
-        background: var(--panel-3);
-        border: 1px solid var(--line);
-        border-radius: 28px;
-        box-shadow: 0 28px 72px var(--shadow);
-        overflow: hidden;
-        position: relative;
+      .topbar-left{display:flex;align-items:center;gap:16px}
+
+      .gallery-label{
+        color:#ffffff;
+        font-weight:700;
+        font-size:16px;
+        letter-spacing:0.02em;
       }
 
-      .topbar {
-        height: 72px;
-        background: rgba(12,13,15,0.9);
-        border-bottom: 1px solid var(--line);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 18px 0 20px;
+      .icon-row{display:flex;align-items:center;gap:10px;margin-left:8px}
+
+      .icon-circle{
+        width:44px;height:44px;border-radius:50%;display:grid;place-items:center;
+        background:var(--circle);border:1px solid rgba(255,255,255,0.03);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.02), 0 3px 10px rgba(0,0,0,0.35);
+        cursor:default;
       }
 
-      .topbar-left,
-      .topbar-right {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
+      .icon-svg{width:20px;height:20px;fill:var(--icon)}
 
-      .pill {
-        border: 1px solid rgba(255,255,255,0.08);
-        background: rgba(255,255,255,0.03);
-        color: var(--text);
-        border-radius: 14px;
-        padding: 8px 12px;
-        font-size: 12px;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
+      /* spacer to keep topbar content left-aligned */
+      .topbar-spacer{flex:1}
 
-      .brand {
-        font-weight: 700;
-        color: #f9f9fa;
-        letter-spacing: 0.08em;
-      }
+      /* Helpers for vertical centering and small accessibility text-size */
+      .sr-label{font-size:13px}
 
-      .workspace {
-        display: grid;
-        grid-template-columns: 96px 1fr 280px;
-        height: calc(100% - 72px);
-      }
-
-      .tools {
-        background: rgba(18,19,22,0.95);
-        border-right: 1px solid var(--line);
-        padding: 16px 12px;
-      }
-
-      .tool-btn {
-        width: 100%;
-        aspect-ratio: 1;
-        margin-bottom: 12px;
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 18px;
-        background: rgba(255,255,255,0.025);
-        color: var(--text);
-        display: grid;
-        place-items: center;
-        font-size: 20px;
-        cursor: pointer;
-        transition: all 0.15s ease;
-      }
-
-      .tool-btn.active {
-        background: linear-gradient(180deg, rgba(250,191,90,0.25), rgba(210,150,86,0.12));
-        border-color: rgba(248,199,92,0.8);
-        box-shadow: inset 0 0 0 1px rgba(248,199,92,0.5);
-      }
-
-      .tool-btn:hover { transform: translateY(-1px); }
-
-      .canvas-area {
-        display: flex;
-        flex-direction: column;
-        padding: 18px 20px 16px;
-        position: relative;
-      }
-
-      .canvas-header {
-        height: 46px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 6px;
-        margin-bottom: 10px;
-      }
-
-      .layer-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .mini-badge {
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.06);
-        border-radius: 10px;
-        padding: 7px 10px;
-        color: var(--muted);
-        font-size: 11px;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-      }
-
-      .canvas-stage {
-        flex: 1;
-        display: grid;
-        place-items: center;
-        position: relative;
-      }
-
-      .artboard-wrap {
-        width: min(100%, 940px);
-        height: min(100%, 760px);
-        position: relative;
-        display: grid;
-        place-items: center;
-      }
-
-      .dark-canvas-shadow {
-        position: absolute;
-        inset: 18px 26px 20px 26px;
-        border-radius: 48px;
-        background: radial-gradient(circle at center, rgba(0,0,0,0.24), rgba(0,0,0,0.5));
-        filter: blur(36px);
-      }
-
-      .artboard {
-        position: relative;
-        width: min(100%, 820px);
-        height: min(100%, 710px);
-        background: var(--canvas-bg);
-        border-radius: 24px;
-        box-shadow: 0 30px 90px var(--canvas-shadow), inset 0 0 0 1px rgba(25,25,25,0.06);
-        overflow: hidden;
-      }
-
-      canvas {
-        display: block;
-        width: 100%;
-        height: 100%;
-        background: #f9f7f3;
-        cursor: crosshair;
-      }
-
-      .context-bar {
-        height: 52px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 8px;
-        background: rgba(17,18,21,0.45);
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        margin-top: 10px;
-      }
-
-      .slider-wrap {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      input[type="range"] {
-        width: 170px;
-        accent-color: #e1ab55;
-      }
-
-      .rightbar {
-        border-left: 1px solid var(--line);
-        background: rgba(16,17,20,0.96);
-        padding: 18px 16px 14px;
-      }
-
-      .panel {
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        background: rgba(255,255,255,0.02);
-        padding: 12px;
-        margin-bottom: 14px;
-      }
-
-      .panel h4 {
-        margin: 0 0 10px;
-        font-size: 11px;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: var(--muted);
-      }
-
-      .swatches {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 10px;
-      }
-
-      .swatch {
-        width: 100%;
-        aspect-ratio: 1;
-        border-radius: 12px;
-        border: 1px solid rgba(255,255,255,0.12);
-        cursor: pointer;
-        box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18);
-      }
-
-      .swatch.active {
-        outline: 2px solid rgba(255,255,255,0.7);
-        outline-offset: 2px;
-      }
-
-      .layers-list {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .layer-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.06);
-        border-radius: 12px;
-        padding: 8px 10px;
-        color: #e9ebef;
-        font-size: 12px;
-      }
-
-      .layer-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: #f6d193;
-        display: inline-block;
-        margin-right: 8px;
-      }
-
-      .layer-left {
-        display: flex;
-        align-items: center;
-      }
-
-      .actions {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0,1fr));
-        gap: 10px;
-      }
-
-      .action-btn {
-        border-radius: 12px;
-        padding: 10px 8px;
-        border: 1px solid var(--line);
-        background: rgba(255,255,255,0.03);
-        color: var(--text);
-        font-size: 12px;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        cursor: pointer;
-      }
-
-      .action-btn.primary {
-        background: linear-gradient(180deg, rgba(248,199,92,0.18), rgba(242,140,85,0.16));
-        border-color: rgba(248,199,92,0.5);
-      }
-
-      .soft-label {
-        color: var(--muted);
-        font-size: 11px;
-        letter-spacing: 0.04em;
-      }
+      main{padding-top:120px}
     </style>
   </head>
   <body>
-    <div class="app">
-      <div class="topbar">
-        <div class="topbar-left">
-          <div class="pill brand">Procreate</div>
-          <div class="pill">Canvas</div>
-        </div>
 
-        <div class="topbar-right">
-          <div class="pill">16:9</div>
-          <div class="pill">Layer 1</div>
-          <div class="pill">Acrylic</div>
+    <div class="topbar" role="banner">
+      <div class="topbar-left">
+        <div class="gallery-label">Gallery</div>
+
+        <div class="icon-row" aria-hidden="false">
+          <!-- Wrench / settings icon -->
+          <div class="icon-circle" title="Wrench">
+            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M22.7 19.3l-4.6-4.6a6.5 6.5 0 0 0 .3-1.8 6.5 6.5 0 0 0-6.5-6.5c-.6 0-1.2.1-1.8.3L4.7 2.3 2.3 4.7l6.9 6.9c-.2.6-.3 1.2-.3 1.8 0 3.6 2.9 6.5 6.5 6.5.6 0 1.2-.1 1.8-.3l6.9 6.9 2.4-2.4-6.1-6.1z" transform="translate(-1 -1)" />
+            </svg>
+          </div>
+
+          <!-- Magic wand icon -->
+          <div class="icon-circle" title="Magic Wand">
+            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M2 21l7-7M7 7l3-3 3 3-3 3-3-3zm7.5 1.5L21 2l1.5 1.5-5.5 5.5-1.5-1.5zM16 9l5 5" stroke="none"/>
+              <!-- Simpler filled wand look -->
+              <path d="M3.3 18.7c-.4.4-.4 1 0 1.4.4.4 1 .4 1.4 0L12 12.8l-2.8-2.8L3.3 18.7zM20.6 5.6l-1.4-1.4-1.1 1.1 1.4 1.4 1.1-1.1z"/>
+            </svg>
+          </div>
+
+          <!-- S-shaped ribbon icon -->
+          <div class="icon-circle" title="Ribbon">
+            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 4c3 0 4 3 7 3s4-3 7-3v5c-3 0-4-3-7-3s-4 3-7 3V4zM6 20c3 0 4-3 7-3s4 3 7 3v-5c-3 0-4 3-7 3s-4-3-7-3v5z"/>
+            </svg>
+          </div>
+
+          <!-- Mouse cursor icon -->
+          <div class="icon-circle" title="Cursor">
+            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 3l18 9-9 3-3 9-6-21z"/>
+            </svg>
+          </div>
         </div>
       </div>
 
-      <div class="workspace">
-        <aside class="tools">
-          <div class="tool-btn active" title="Brush">✏️</div>
-          <div class="tool-btn" title="Eraser">🧽</div>
-          <div class="tool-btn" title="Selection">◉</div>
-          <div class="tool-btn" title="Fill">▣</div>
-          <div class="tool-btn" title="Move">↔</div>
-          <div class="tool-btn" title="Eyedropper">◌</div>
-        </aside>
+      <div class="topbar-spacer"></div>
 
-        <main class="canvas-area">
-          <div class="canvas-header">
-            <div class="layer-row">
-              <span class="mini-badge">Canvas</span>
-              <span class="mini-badge">Bristol</span>
-            </div>
-            <div class="layer-row">
-              <span class="mini-badge">Opacity 100%</span>
-              <span class="mini-badge">Blend Normal</span>
-            </div>
-          </div>
-
-          <div class="canvas-stage">
-            <div class="artboard-wrap">
-              <div class="dark-canvas-shadow"></div>
-              <div class="artboard">
-                <canvas id="paintCanvas"></canvas>
-              </div>
-            </div>
-          </div>
-
-          <div class="context-bar">
-            <div class="slider-wrap">
-              <span>Brush</span>
-              <input id="sizeSlider" type="range" min="2" max="80" value="18" />
-              <span id="sizeValue">18px</span>
-            </div>
-            <div class="slider-wrap">
-              <span>Opacity</span>
-              <input id="opacitySlider" type="range" min="10" max="100" value="100" />
-              <span id="opacityValue">100%</span>
-            </div>
-          </div>
-        </main>
-
-        <aside class="rightbar">
-          <div class="panel">
-            <h4>Colors</h4>
-            <div class="swatches">
-              <div class="swatch active" data-color="#1e1e1e" style="background:#1e1e1e"></div>
-              <div class="swatch" data-color="#f5d2a8" style="background:#f5d2a8"></div>
-              <div class="swatch" data-color="#a5d6ff" style="background:#a5d6ff"></div>
-              <div class="swatch" data-color="#d88c8c" style="background:#d88c8c"></div>
-              <div class="swatch" data-color="#6dd39a" style="background:#6dd39a"></div>
-              <div class="swatch" data-color="#f2b54e" style="background:#f2b54e"></div>
-              <div class="swatch" data-color="#8f7ae9" style="background:#8f7ae9"></div>
-              <div class="swatch" data-color="#f9f6ee" style="background:#f9f6ee"></div>
-              <div class="swatch" data-color="#d44a4a" style="background:#d44a4a"></div>
-              <div class="swatch" data-color="#5c8dff" style="background:#5c8dff"></div>
-              <div class="swatch" data-color="#ff8f5d" style="background:#ff8f5d"></div>
-              <div class="swatch" data-color="#37b76e" style="background:#37b76e"></div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h4>Layers</h4>
-            <div class="layers-list">
-              <div class="layer-item">
-                <div class="layer-left"><span class="layer-dot"></span>Base</div>
-                <span class="soft-label">Visible</span>
-              </div>
-              <div class="layer-item">
-                <div class="layer-left"><span class="layer-dot" style="background:#9ad3ff"></span>Sketch</div>
-                <span class="soft-label">Hidden</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="panel">
-            <h4>Actions</h4>
-            <div class="actions">
-              <button class="action-btn primary" id="saveBtn">Save</button>
-              <button class="action-btn" id="clearBtn">Clear</button>
-              <button class="action-btn" id="undoBtn">Undo</button>
-              <button class="action-btn" id="downloadBtn">Export</button>
-            </div>
-          </div>
-        </aside>
-      </div>
+      <!-- right side empty for now, keeps left layout stable -->
+      <div aria-hidden="true" style="opacity:0.6;font-size:13px">&nbsp;</div>
     </div>
 
-    <script>
-      const canvas = document.getElementById('paintCanvas');
-      const ctx = canvas.getContext('2d');
-      const sizeSlider = document.getElementById('sizeSlider');
-      const opacitySlider = document.getElementById('opacitySlider');
-      const sizeValue = document.getElementById('sizeValue');
-      const opacityValue = document.getElementById('opacityValue');
-      const swatches = document.querySelectorAll('.swatch');
+    <main>
+      <!-- Empty canvas area placeholder; user asked to first create background + topbar -->
+    </main>
 
-      let drawing = false;
-      let currentColor = '#1e1e1e';
-      let brushSize = Number(sizeSlider.value);
-      let opacity = Number(opacitySlider.value) / 100;
-      let lastX = 0;
-      let lastY = 0;
-      const history = [];
-
-      function resizeCanvas() {
-        const rect = canvas.getBoundingClientRect();
-        const ratio = window.devicePixelRatio || 1;
-        canvas.width = Math.max(1, rect.width * ratio);
-        canvas.height = Math.max(1, rect.height * ratio);
-        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-        if (!history.length) {
-          ctx.fillStyle = '#f9f7f3';
-          ctx.fillRect(0, 0, rect.width, rect.height);
-        }
-      }
-
-      function saveState() {
-        history.push(canvas.toDataURL());
-        if (history.length > 18) history.shift();
-      }
-
-      function setColor(color) {
-        currentColor = color;
-        swatches.forEach((sw) => sw.classList.toggle('active', sw.dataset.color === color));
-      }
-
-      function beginStroke(x, y) {
-        drawing = true;
-        lastX = x;
-        lastY = y;
-        saveState();
-      }
-
-      function drawStroke(x, y) {
-        if (!drawing) return;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.strokeStyle = currentColor;
-        ctx.lineWidth = brushSize;
-        ctx.globalAlpha = opacity;
-        ctx.beginPath();
-        ctx.moveTo(lastX, lastY);
-        ctx.lineTo(x, y);
-        ctx.stroke();
-        lastX = x;
-        lastY = y;
-      }
-
-      function endStroke() {
-        drawing = false;
-        ctx.globalAlpha = 1;
-      }
-
-      function applyPointer(event) {
-        const rect = canvas.getBoundingClientRect();
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-        return { x, y };
-      }
-
-      canvas.addEventListener('pointerdown', (event) => {
-        const { x, y } = applyPointer(event);
-        canvas.setPointerCapture(event.pointerId);
-        beginStroke(x, y);
-      });
-
-      canvas.addEventListener('pointermove', (event) => {
-        if (!drawing) return;
-        const { x, y } = applyPointer(event);
-        drawStroke(x, y);
-      });
-
-      canvas.addEventListener('pointerup', endStroke);
-      canvas.addEventListener('pointerleave', endStroke);
-      canvas.addEventListener('pointercancel', endStroke);
-
-      sizeSlider.addEventListener('input', () => {
-        brushSize = Number(sizeSlider.value);
-        sizeValue.textContent = `${brushSize}px`;
-      });
-
-      opacitySlider.addEventListener('input', () => {
-        opacity = Number(opacitySlider.value) / 100;
-        opacityValue.textContent = `${Math.round(opacity * 100)}%`;
-      });
-
-      swatches.forEach((swatch) => {
-        swatch.addEventListener('click', () => setColor(swatch.dataset.color));
-      });
-
-      document.getElementById('clearBtn').addEventListener('click', () => {
-        const rect = canvas.getBoundingClientRect();
-        saveState();
-        ctx.clearRect(0, 0, rect.width, rect.height);
-        ctx.fillStyle = '#f9f7f3';
-        ctx.fillRect(0, 0, rect.width, rect.height);
-      });
-
-      document.getElementById('undoBtn').addEventListener('click', () => {
-        if (!history.length) return;
-        const previous = history.pop();
-        const img = new Image();
-        img.onload = () => {
-          const rect = canvas.getBoundingClientRect();
-          ctx.clearRect(0, 0, rect.width, rect.height);
-          ctx.fillStyle = '#f9f7f3';
-          ctx.fillRect(0, 0, rect.width, rect.height);
-          ctx.drawImage(img, 0, 0, rect.width, rect.height);
-        };
-        img.src = previous;
-      });
-
-      document.getElementById('saveBtn').addEventListener('click', () => {
-        const link = document.createElement('a');
-        link.download = 'procreate-like-sketch.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-      });
-
-      document.getElementById('downloadBtn').addEventListener('click', () => {
-        document.getElementById('saveBtn').click();
-      });
-
-      window.addEventListener('resize', resizeCanvas);
-      setColor('#1e1e1e');
-      resizeCanvas();
-    </script>
   </body>
 </html>
