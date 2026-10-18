@@ -8,9 +8,8 @@
       :root{
         --bg:#242424; /* requested background */
         --grid:#2D2D2D; /* grid lines */
-        --topbar: rgba(30,30,30,0.55); /* slightly darker, transparent */
-        --topbar-border: rgba(0,0,0,0.35);
-        --circle:#2b2b2b; /* dark gray circle */
+        --topbar: rgba(30,30,30,0.85); /* slightly darker, semi-transparent */
+        --circle:#1d1d1d; /* darker gray circle */
         --icon:#cfcfcf; /* light gray icon */
         --gap:12px;
       }
@@ -30,50 +29,46 @@
         color: #fff;
       }
 
+      /* Topbar: flush to top/left/right, sleeker height, no floating shadow or radius */
       .topbar{
-        height:64px;
+        height:48px;
         display:flex;
         align-items:center;
         gap:var(--gap);
-        padding:0 20px;
-        /* slightly darker + translucent with blur */
+        padding:0 18px;
         background:var(--topbar);
-        backdrop-filter: blur(6px);
-        -webkit-backdrop-filter: blur(6px);
-        border-bottom:1px solid var(--topbar-border);
+        /* slight translucency kept, but NO shadows and no blur */
         position:fixed;
-        left:24px;right:24px;top:24px;
-        border-radius:12px;
-        box-shadow:0 6px 18px rgba(0,0,0,0.45);
+        left:0;right:0;top:0;
+        border-bottom:1px solid rgba(0,0,0,0.35);
       }
 
-      .topbar-left{display:flex;align-items:center;gap:16px}
+      .topbar-left{display:flex;align-items:center;gap:14px}
 
+      /* Gallery text: lighter weight and smaller */
       .gallery-label{
         color:#ffffff;
-        font-weight:700;
-        font-size:16px;
-        letter-spacing:0.02em;
+        font-weight:500;
+        font-size:14px;
+        letter-spacing:0.01em;
       }
 
-      .icon-row{display:flex;align-items:center;gap:10px;margin-left:8px}
+      .icon-row{display:flex;align-items:center;gap:10px;margin-left:6px}
 
+      /* Dark circular buttons, no shadow, darker fill */
       .icon-circle{
-        width:44px;height:44px;border-radius:50%;display:grid;place-items:center;
-        background:var(--circle);border:1px solid rgba(255,255,255,0.03);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.02), 0 3px 10px rgba(0,0,0,0.35);
-        cursor:default;
+        width:40px;height:40px;border-radius:50%;display:grid;place-items:center;
+        background:var(--circle);
+        border:1px solid rgba(255,255,255,0.03);
+        cursor:pointer;
       }
 
-      .icon-svg{width:20px;height:20px;fill:var(--icon)}
+      .icon-svg{width:18px;height:18px;fill:var(--icon)}
 
-      /* spacer to keep topbar content left-aligned */
       .topbar-spacer{flex:1}
 
-      /* Helpers for vertical centering and small accessibility text-size */
-      .sr-label{font-size:13px}
+      main{padding-top:48px}
 
-      main{padding-top:120px}
     </style>
   </head>
   <body>
@@ -83,33 +78,31 @@
         <div class="gallery-label">Gallery</div>
 
         <div class="icon-row" aria-hidden="false">
-          <!-- Wrench / settings icon -->
+          <!-- Wrench / settings icon (simple, darker button) -->
           <div class="icon-circle" title="Wrench">
             <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M22.7 19.3l-4.6-4.6a6.5 6.5 0 0 0 .3-1.8 6.5 6.5 0 0 0-6.5-6.5c-.6 0-1.2.1-1.8.3L4.7 2.3 2.3 4.7l6.9 6.9c-.2.6-.3 1.2-.3 1.8 0 3.6 2.9 6.5 6.5 6.5.6 0 1.2-.1 1.8-.3l6.9 6.9 2.4-2.4-6.1-6.1z" transform="translate(-1 -1)" />
+              <path d="M21.7 13.3a1 1 0 0 0-1.2-.6l-2 .6a7 7 0 0 0-3.2-3.2l.6-2a1 1 0 0 0-.6-1.2l-2-1a1 1 0 0 0-1 .2L6 6.6A5 5 0 1 0 17.4 18l3.7-3.7a1 1 0 0 0 .6-1z"/>
             </svg>
           </div>
 
           <!-- Magic wand icon -->
           <div class="icon-circle" title="Magic Wand">
             <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M2 21l7-7M7 7l3-3 3 3-3 3-3-3zm7.5 1.5L21 2l1.5 1.5-5.5 5.5-1.5-1.5zM16 9l5 5" stroke="none"/>
-              <!-- Simpler filled wand look -->
-              <path d="M3.3 18.7c-.4.4-.4 1 0 1.4.4.4 1 .4 1.4 0L12 12.8l-2.8-2.8L3.3 18.7zM20.6 5.6l-1.4-1.4-1.1 1.1 1.4 1.4 1.1-1.1z"/>
+              <path d="M3 17.5L10.5 10 14 13.5 6.5 21 3 17.5zM19 7l1.5-1.5L22 6l-1.5 1.5L19 7zm-4-1l.7-2 .7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>
             </svg>
           </div>
 
-          <!-- S-shaped ribbon icon -->
+          <!-- S-shaped ribbon icon (stylized S) -->
           <div class="icon-circle" title="Ribbon">
             <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6 4c3 0 4 3 7 3s4-3 7-3v5c-3 0-4-3-7-3s-4 3-7 3V4zM6 20c3 0 4-3 7-3s4 3 7 3v-5c-3 0-4 3-7 3s-4-3-7-3v5z"/>
+              <path d="M6 6c2.5 0 3.5 2 6 2s3.5-2 6-2v3c-2.5 0-3.5 2-6 2s-3.5-2-6-2V6zM6 15c2.5 0 3.5-2 6-2s3.5 2 6 2v-3c-2.5 0-3.5-2-6-2s-3.5 2-6 2v3z"/>
             </svg>
           </div>
 
           <!-- Mouse cursor icon -->
           <div class="icon-circle" title="Cursor">
             <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3 3l18 9-9 3-3 9-6-21z"/>
+              <path d="M3 3l6 12 3-2 6 8-15-18z"/>
             </svg>
           </div>
         </div>
@@ -117,12 +110,12 @@
 
       <div class="topbar-spacer"></div>
 
-      <!-- right side empty for now, keeps left layout stable -->
+      <!-- right side kept empty intentionally -->
       <div aria-hidden="true" style="opacity:0.6;font-size:13px">&nbsp;</div>
     </div>
 
     <main>
-      <!-- Empty canvas area placeholder; user asked to first create background + topbar -->
+      <!-- Empty canvas area placeholder; background & topbar updated per request -->
     </main>
 
   </body>
