@@ -8,11 +8,13 @@
       :root{
         --bg:#242424; /* requested background */
         --grid:#2D2D2D; /* grid lines */
-        --topbar: rgba(30,30,30,0.60); /* slightly darker, semi-transparent */
-        --circle:#111111; /* darker gray circle */
-        --icon:#cfcfcf; /* light gray icon */
+        --topbar: rgba(24,24,24,0.78); /* slightly darker, semi-transparent (darker than before but lighter than buttons) */
+        --circle:#0d0d0d; /* very dark buttons */
+        --icon:#bfbfbf; /* muted light gray icon */
         --gap:12px;
-        --topbar-height:48px;
+        --topbar-height:44px; /* slim bar */
+        --frame-inset:12px; /* inset for outer border to emulate device rounding */
+        --frame-radius:34px; /* curvature approximating iPad corners */
       }
 
       /* Full window background with a small square grid using CSS gradients */
@@ -30,23 +32,47 @@
         color: #fff;
       }
 
-      /* Topbar: flush to top/left/right, sleeker height, controlled blur, no shadows or radius */
+      /* Device frame: thin border around the whole viewport with rounded corners to match iPad curvature */
+      .device-frame{
+        position:fixed;
+        left:var(--frame-inset);
+        right:var(--frame-inset);
+        top:var(--frame-inset);
+        bottom:var(--frame-inset);
+        border:1px solid var(--grid);
+        border-radius:var(--frame-radius);
+        pointer-events:none; /* don't block clicks */
+        box-sizing:border-box;
+      }
+
+      /* Topbar: flush to top/left/right inside the device frame; sleeker height, controlled blur, no shadows or radius */
       .topbar{
         height:var(--topbar-height);
         display:flex;
         align-items:center;
         gap:var(--gap);
+        /* place topbar exactly at device-frame's top edge visually by matching inset */
+        position:fixed;
+        left:var(--frame-inset);
+        right:var(--frame-inset);
+        top:var(--frame-inset);
         padding:0 18px;
         background:var(--topbar);
-        /* add stronger backdrop blur as requested */
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
-        border-bottom:1px solid var(--grid); /* bottom line same color as grid */
-        position:fixed;
-        left:0;right:0;top:0;
+        border:1px solid var(--grid); /* border around topbar that matches grid color */
+        border-bottom:none; /* avoid double border at bottom since device frame exists */
+        box-sizing:border-box;
       }
 
-      .topbar-left{display:flex;align-items:center;gap:14px}
+      /* To avoid an extra line between topbar and frame, draw a top-only border on frame, so we keep a consistent outline */
+      .device-frame::before{
+        content: '';
+        position: absolute;
+        left:0;right:0;top:0;height:0; /* placeholder to ensure stacking */
+      }
+
+      .topbar-left{display:flex;align-items:center;gap:12px}
 
       /* Gallery text: lighter weight and smaller */
       .gallery-label{
@@ -56,25 +82,36 @@
         letter-spacing:0.01em;
       }
 
-      .icon-row{display:flex;align-items:center;gap:22px;margin-left:8px}
+      /* push the buttons farther away from Gallery by increasing left margin */
+      .icon-row{display:flex;align-items:center;gap:18px;margin-left:26px}
 
-      /* Dark circular buttons, no shadow, darker fill */
+      /* Slightly smaller circular buttons, flat */
       .icon-circle{
-        width:40px;height:40px;border-radius:50%;display:grid;place-items:center;
+        width:32px;height:32px;border-radius:50%;display:grid;place-items:center;
         background:var(--circle);
         border:none;
         cursor:pointer;
+        outline:none;
       }
 
-      .icon-svg{width:18px;height:18px;fill:var(--icon)}
+      .icon-svg{width:14px;height:14px;fill:var(--icon)}
 
       .topbar-spacer{flex:1}
 
-      main{height:calc(100% - var(--topbar-height));overflow:hidden}
+      /* Keep the content area fixed and not scrollable */
+      main{position:fixed;left:var(--frame-inset);right:var(--frame-inset);top:calc(var(--frame-inset) + var(--topbar-height));bottom:var(--frame-inset);overflow:hidden}
+
+      /* optional: center placeholder area visually for future canvas */
+      .canvas-placeholder{height:100%;display:flex;align-items:center;justify-content:center;color:#bdbdbd}
+
+      /* accessibility focus state (no shadows) */
+      .icon-circle:focus{box-shadow:0 0 0 2px rgba(255,255,255,0.06)}
 
     </style>
   </head>
   <body>
+
+    <div class="device-frame" aria-hidden="true"></div>
 
     <div class="topbar" role="banner">
       <div class="topbar-left">
@@ -118,7 +155,7 @@
     </div>
 
     <main>
-      <!-- Empty canvas area placeholder; background & topbar updated per request -->
+      <div class="canvas-placeholder">Canvas area (to be added)</div>
     </main>
 
   </body>
