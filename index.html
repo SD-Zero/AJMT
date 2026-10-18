@@ -8,14 +8,15 @@
       :root{
         --bg:#242424; /* requested background */
         --grid:#2D2D2D; /* grid lines */
-        --topbar: rgba(30,30,30,0.85); /* slightly darker, semi-transparent */
-        --circle:#1d1d1d; /* darker gray circle */
+        --topbar: rgba(30,30,30,0.60); /* slightly darker, semi-transparent */
+        --circle:#111111; /* darker gray circle */
         --icon:#cfcfcf; /* light gray icon */
         --gap:12px;
+        --topbar-height:48px;
       }
 
       /* Full window background with a small square grid using CSS gradients */
-      html,body{height:100%;margin:0}
+      html,body{height:100%;margin:0;overflow:hidden}
       body{
         background-color:var(--bg);
         /* small 16px grid */
@@ -29,18 +30,20 @@
         color: #fff;
       }
 
-      /* Topbar: flush to top/left/right, sleeker height, no floating shadow or radius */
+      /* Topbar: flush to top/left/right, sleeker height, controlled blur, no shadows or radius */
       .topbar{
-        height:48px;
+        height:var(--topbar-height);
         display:flex;
         align-items:center;
         gap:var(--gap);
         padding:0 18px;
         background:var(--topbar);
-        /* slight translucency kept, but NO shadows and no blur */
+        /* add stronger backdrop blur as requested */
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom:1px solid var(--grid); /* bottom line same color as grid */
         position:fixed;
         left:0;right:0;top:0;
-        border-bottom:1px solid rgba(0,0,0,0.35);
       }
 
       .topbar-left{display:flex;align-items:center;gap:14px}
@@ -48,18 +51,18 @@
       /* Gallery text: lighter weight and smaller */
       .gallery-label{
         color:#ffffff;
-        font-weight:500;
-        font-size:14px;
+        font-weight:400;
+        font-size:13px;
         letter-spacing:0.01em;
       }
 
-      .icon-row{display:flex;align-items:center;gap:10px;margin-left:6px}
+      .icon-row{display:flex;align-items:center;gap:22px;margin-left:8px}
 
       /* Dark circular buttons, no shadow, darker fill */
       .icon-circle{
         width:40px;height:40px;border-radius:50%;display:grid;place-items:center;
         background:var(--circle);
-        border:1px solid rgba(255,255,255,0.03);
+        border:none;
         cursor:pointer;
       }
 
@@ -67,7 +70,7 @@
 
       .topbar-spacer{flex:1}
 
-      main{padding-top:48px}
+      main{height:calc(100% - var(--topbar-height));overflow:hidden}
 
     </style>
   </head>
@@ -78,40 +81,40 @@
         <div class="gallery-label">Gallery</div>
 
         <div class="icon-row" aria-hidden="false">
-          <!-- Wrench / settings icon (simple, darker button) -->
-          <div class="icon-circle" title="Wrench">
+          <!-- Wrench / settings icon (filled, minimal) -->
+          <button class="icon-circle" title="Wrench" aria-label="Wrench">
             <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M21.7 13.3a1 1 0 0 0-1.2-.6l-2 .6a7 7 0 0 0-3.2-3.2l.6-2a1 1 0 0 0-.6-1.2l-2-1a1 1 0 0 0-1 .2L6 6.6A5 5 0 1 0 17.4 18l3.7-3.7a1 1 0 0 0 .6-1z"/>
+              <path d="M21.5 14.8l-3.6-3.6a6.1 6.1 0 0 0 .2-1.2 6.1 6.1 0 0 0-6.1-6.1c-.4 0-.8.05-1.2.15L6.4 1.6 4.6 3.4l3.9 3.9c-.1.4-.15.8-.15 1.2 0 3 2.5 5.5 5.5 5.5.4 0 .8-.05 1.2-.15l3.9 3.9 1.8-1.8-3.1-3.1z"/>
             </svg>
-          </div>
+          </button>
 
           <!-- Magic wand icon -->
-          <div class="icon-circle" title="Magic Wand">
+          <button class="icon-circle" title="Magic Wand" aria-label="Magic Wand">
             <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3 17.5L10.5 10 14 13.5 6.5 21 3 17.5zM19 7l1.5-1.5L22 6l-1.5 1.5L19 7zm-4-1l.7-2 .7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>
+              <path d="M3.6 18.4L10.4 11 13 13.6 6.2 20.4 3.6 18.4zM19 7l1.2-1.2L21.4 7 20.2 8.2 19 7zm-4-1l.6-1.6.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/>
             </svg>
-          </div>
+          </button>
 
           <!-- S-shaped ribbon icon (stylized S) -->
-          <div class="icon-circle" title="Ribbon">
+          <button class="icon-circle" title="Ribbon" aria-label="Ribbon">
             <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6 6c2.5 0 3.5 2 6 2s3.5-2 6-2v3c-2.5 0-3.5 2-6 2s-3.5-2-6-2V6zM6 15c2.5 0 3.5-2 6-2s3.5 2 6 2v-3c-2.5 0-3.5-2-6-2s-3.5 2-6 2v3z"/>
+              <path d="M6 6c2.2 0 3 1.7 5 1.7s2.8-1.7 5-1.7v2c-2.2 0-3 1.7-5 1.7s-2.8-1.7-5-1.7V6zM6 15c2.2 0 3-1.7 5-1.7s2.8 1.7 5 1.7v-2c-2.2 0-3-1.7-5-1.7s-2.8 1.7-5 1.7v2z"/>
             </svg>
-          </div>
+          </button>
 
           <!-- Mouse cursor icon -->
-          <div class="icon-circle" title="Cursor">
+          <button class="icon-circle" title="Cursor" aria-label="Cursor">
             <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M3 3l6 12 3-2 6 8-15-18z"/>
             </svg>
-          </div>
+          </button>
         </div>
       </div>
 
       <div class="topbar-spacer"></div>
 
       <!-- right side kept empty intentionally -->
-      <div aria-hidden="true" style="opacity:0.6;font-size:13px">&nbsp;</div>
+      <div aria-hidden="true" style="opacity:0.6;font-size:13px;padding-right:18px">&nbsp;</div>
     </div>
 
     <main>
