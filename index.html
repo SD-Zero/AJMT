@@ -1,190 +1,940 @@
-        --topbar: rgba(0,0,0,0.60); /* topbar: near-black, semi-transparent */
-        --circle:#1A1A1A; /* slightly lighter button background */
-        --icon:#bfbfbf; /* muted light gray icon */
-        --selected-color:#f5d2a8; /* default selected color */
-        --gap:12px;
-        --topbar-height:44px; /* slim bar */
-        --frame-radius:40px; /* default radius, recalculated by JS */
-@@ -39,7 +40,7 @@
-        box-sizing:border-box;
-      }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animal Jam Mastertrack Studio</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <style>
+    :root {
+      --bg-color: #231438;
+      --card-bg: #351f54;
+      --accent: #ffe66d;
+      --highlight: #4ecdc4;
+      --text-main: #f5efff;
+      --danger: #ff4757;
 
-      /* Topbar: flush to the very top and full width, no rounded edges on the bar itself */
-      /* Topbar: flush to the very top and full width, no curved topbar edges */
-      .topbar{
-        height:var(--topbar-height);
-        display:flex;align-items:center;gap:var(--gap);
-@@ -71,12 +72,19 @@
-      }
+      /* toolbar vars for header changes */
+      --tool-gap: 34px; /* spacing between icons left & right */
+      --icon-size: 18px; /* displayed SVG size */
+      --icon-touch-size: 30px; /* touch target */
+      --color-circle-size: 28px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .controls-card {
+      background: var(--card-bg);
+      padding: 18px 24px;
+      border-radius: 14px;
+      max-width: 950px;
+      width: 100%;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-sizing: border-box;
+    }
 
-      /* Buttons moved farther from gallery and slightly smaller */
-      .icon-row{display:flex;align-items:center;gap:18px;margin-left:26px}
-      .icon-row{display:flex;align-items:center;gap:28px;margin-left:34px}
-      .icon-circle{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--circle);border:none;cursor:default}
-      .icon-svg{width:14px;height:14px;fill:var(--icon)}
+    /* Header tools - left and right icons (plain, no circular bg) */
+    .header-row { width: 100%; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .header-left, .header-right { display:flex; align-items:center; gap:var(--tool-gap); }
 
-      .topbar-spacer{flex:1}
+    .project-name {
+      color: var(--accent);
+      margin: 0;
+      font-size: 1.3rem;
+      font-weight:700;
+      text-align:center;
+      flex:1;
+      -webkit-user-select:text; user-select:text; /* editable/selectable */
+      outline: none;
+      background: transparent;
+      border: none;
+    }
 
-      /* Right-side plain tool strip (no background buttons except the color circle) */
-      .topbar-right{display:flex;align-items:center;gap:18px;margin-right:8px}
-      .plain-tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px 4px;background:transparent;border:none;color:var(--icon);cursor:default}
-      .plain-tool .plain-svg{width:18px;height:18px;fill:var(--icon)}
-      .color-circle{width:28px;height:28px;border-radius:50%;background:var(--selected-color);border:2px solid var(--icon);box-sizing:border-box}
-      .plain-tool.selected::after{content:"";display:block;width:18px;height:2px;background:var(--icon);border-radius:2px;margin-top:4px}
+    .plain-tool { background: transparent; border: none; padding: 6px; width: var(--icon-touch-size); height: var(--icon-touch-size); display:flex; align-items:center; justify-content:center; cursor: pointer; }
+    .plain-tool img { width: var(--icon-size); height: var(--icon-size); display:block; filter: invert(1) brightness(2); }
+    .color-circle { width: var(--color-circle-size); height: var(--color-circle-size); border-radius:50%; border:2px solid #ffffff; box-sizing:border-box; }
 
-      /* Content area fixed and not scrollable */
-      main{position:fixed;left:0;right:0;top:var(--topbar-height);bottom:0;overflow:hidden}
-      .canvas-placeholder{height:100%;display:flex;align-items:center;justify-content:center;color:#8b8b8b}
-@@ -95,22 +103,22 @@
-        <div id="galleryLabel" class="gallery-label nonselectable" role="button" aria-label="Gallery">Gallery</div>
+    h1 { display:none; } /* hide old heading so layout stays same but we use project-name editable element */
 
-        <div class="icon-row" aria-hidden="false">
-          <!-- Actions (was wrench) -->
-          <!-- Actions -->
-          <button id="tool-actions" class="icon-circle nonselectable" data-tool="Actions" title="Actions" aria-label="Actions">
-            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.5 14.8l-3.6-3.6a6.1 6.1 0 0 0 .2-1.2 6.1 6.1 0 0 0-6.1-6.1c-.4 0-.8.05-1.2.15L6.4 1.6 4.6 3.4l3.9 3.9c-.1.4-.15.8-.15 1.2 0 3 2.5 5.5 5.5 5.5.4 0 .8-.05 1.2-.15l3.9 3.9 1.8-1.8-3.1-3.1z"/></svg>
-          </button>
+    .control-group { display: flex; align-items: center; gap: 8px; }
+    label { font-size: 0.9rem; color: #d8c7ed; font-weight: 600; }
+    input[type="number"], select {
+      background: #190b2c;
+      color: var(--accent);
+      border: 1px solid #5a388a;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+    .btn {
+      background: var(--highlight);
+      color: #0f2422;
+      border: none;
+      padding: 9px 18px;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn:disabled { background: #554466; color: #887799; cursor: not-allowed; }
+    input[type="file"] { display: none; }
 
-          <!-- Adjustments (was wand) -->
-          <!-- Adjustments -->
-          <button id="tool-adjustments" class="icon-circle nonselectable" data-tool="Adjustments" title="Adjustments" aria-label="Adjustments">
-            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 18.4L10.4 11 13 13.6 6.2 20.4 3.6 18.4zM19 7l1.2-1.2L21.4 7 20.2 8.2 19 7zm-4-1l.6-1.6.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></svg>
-          </button>
+    .tracks-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+      max-width: 950px;
+    }
+    .track-card {
+      background: #1c0e30;
+      border: 2px solid #4a2d6d;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+    }
+    .track-header {
+      background: #351f54;
+      padding: 8px 15px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--accent);
+      border-bottom: 1px solid #4a2d6d;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .instrument-select {
+      background: #231438;
+      color: var(--accent);
+      border: 1px solid var(--highlight);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 0.85rem;
+    }
 
-          <!-- Selections (was ribbon) -->
-          <!-- Selections -->
-          <button id="tool-selections" class="icon-circle nonselectable" data-tool="Selections" title="Selections" aria-label="Selections">
-            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6c2.2 0 3 1.7 5 1.7s2.8-1.7 5-1.7v2c-2.2 0-3 1.7-5 1.7s-2.8-1.7-5-1.7V6zM6 15c2.2 0 3-1.7 5-1.7s2.8 1.7 5 1.7v-2c-2.2 0-3-1.7-5-1.7s-2.8 1.7-5 1.7v2z"/></svg>
-          </button>
+    .grid-wrapper { display: flex; width: 100%; }
 
-          <!-- Transform (was cursor) -->
-          <!-- Transform -->
-          <button id="tool-transform" class="icon-circle nonselectable" data-tool="Transform" title="Transform" aria-label="Transform">
-            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l6 12 3-2 6 8-15-18z"/></svg>
-          </button>
-@@ -119,10 +127,35 @@
+    .pitch-labels {
+      display: flex;
+      flex-direction: column;
+      width: 50px;
+      background: #281542;
+      border-right: 2px solid #4a2d6d;
+      flex-shrink: 0;
+    }
+    .pitch-label {
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.7rem;
+      color: #ffffff;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+      box-sizing: border-box;
+    }
 
-      <div class="topbar-spacer"></div>
+    .canvas-container {
+      flex: 1;
+      overflow-x: auto;
+      overflow-y: hidden;
+      background: #140824;
+      position: relative;
+    }
+    canvas { display: block; cursor: pointer; }
 
-      <!-- right-side tools (right-to-left visual order: Color at far right) -->
-      <div class="topbar-right" aria-hidden="false">
-        <!-- Paint (selected by default) -->
-        <button id="tool-paint" class="plain-tool selected" data-tool="Paint" aria-label="Paint" title="Paint">
-          <svg class="plain-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21l3-1 7-7 4-4 2 2-4 4-7 7-1 3-4-4z"/></svg>
-        </button>
+    /* Note Inspector Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(10, 5, 20, 0.75);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-card {
+      background: var(--card-bg);
+      border: 2px solid var(--highlight);
+      border-radius: 12px;
+      padding: 20px 24px;
+      width: 320px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    .modal-title {
+      font-weight: 800;
+      font-size: 1.1rem;
+      color: var(--accent);
+      margin: 0;
+    }
+    .modal-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
 
-        <!-- Smudge -->
-        <button id="tool-smudge" class="plain-tool" data-tool="Smudge" aria-label="Smudge" title="Smudge">
-          <svg class="plain-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c-1.1 0-2 .9-2 2 0 .6.3 1.1.7 1.5L4 13v6h6l7.5-7.5c.4.4.9.7 1.5.7 1.1 0 2-.9 2-2S20.1 6 19 6c-.6 0-1.1.3-1.5.7L14.5 3H12z"/></svg>
-        </button>
+<div class="controls-card">
+  <!-- Header row: left icons, editable project title, right icons -->
+  <div class="header-row">
+    <div class="header-left">
+      <button class="plain-tool" id="tool-actions" title="Actions" aria-label="Actions">
+        <img src="https://www.svgrepo.com/show/535743/wrench.svg" alt="wrench">
+      </button>
 
-        <!-- Erase -->
-        <button id="tool-erase" class="plain-tool" data-tool="Erase" aria-label="Erase" title="Erase">
-          <svg class="plain-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M16.24 3.56l4.2 4.2c.78.78.78 2.05 0 2.83l-8.48 8.49-6.36-6.36L9.86 3.56c.78-.78 2.05-.78 2.83 0l3.55 3.55 0 0z"/></svg>
-        </button>
+      <button class="plain-tool" id="tool-adjustments" title="Adjustments" aria-label="Adjustments">
+        <img src="https://www.svgrepo.com/show/435698/magic-wand.svg" alt="wand">
+      </button>
 
-        <!-- Layers (icon only) -->
-        <button id="tool-layers" class="plain-tool" data-tool="Layers" aria-label="Layers" title="Layers">
-          <svg class="plain-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L1 7l11 5 9-4.09V17h2V7L12 2zM3 9.23V12l9 4 9-4V9.23L12 13 3 9.23z"/></svg>
-        </button>
+      <button class="plain-tool" id="tool-selections" title="Selections" aria-label="Selections">
+        <img src="https://www.svgrepo.com/show/522273/selection.svg" alt="selection">
+      </button>
 
-        <!-- Color circle (shows selected color) -->
-        <div id="tool-color" class="color-circle" role="button" aria-label="Color" title="Color"></div>
-      </div>
-
-      <!-- centered project name (editable) -->
-      <div class="project-name" id="projectName" contenteditable="true" role="textbox" aria-label="Project name">Unnamed Project</div>
-
-      <div aria-hidden="true" style="opacity:0.6;font-size:13px;padding-right:18px">&nbsp;</div>
+      <button class="plain-tool" id="tool-transform" title="Transform" aria-label="Transform">
+        <img src="https://www.svgrepo.com/show/535338/cursor.svg" alt="cursor">
+      </button>
     </div>
 
-    <main>
-@@ -140,26 +173,77 @@
-      window.addEventListener('resize', updateFrameRadius);
-      updateFrameRadius();
+    <div style="display:flex;flex:1;justify-content:center">
+      <div id="projectName" class="project-name" contenteditable="true">Animal Jam Mastertrack Studio</div>
+    </div>
 
-      // Block mouse-only pointer interactions so the UI is touch-first.
-      // This allows touch & pen while preventing mouse clicks/drags.
-      // Spread out left icons: handled by CSS (.icon-row gap increased)
+    <div class="header-right">
+      <button class="plain-tool" id="tool-paint" title="Paint" aria-label="Paint">
+        <img src="https://www.svgrepo.com/show/485640/brush.svg" alt="paint">
+      </button>
 
-      // Touch-first behavior: block mouse-only pointer interactions so UI is optimized for touch/pen.
-      function blockMousePointers(e) {
-        if (e.pointerType === 'mouse') e.preventDefault();
-      }
-      window.addEventListener('pointerdown', blockMousePointers, {capture:true});
-      window.addEventListener('pointermove', function(e){ if(e.pointerType==='mouse') e.preventDefault(); }, {capture:true});
-      window.addEventListener('pointerup', blockMousePointers, {capture:true});
+      <button class="plain-tool" id="tool-smudge" title="Smudge" aria-label="Smudge">
+        <img src="https://www.svgrepo.com/show/535580/point-down.svg" alt="smudge">
+      </button>
 
-      // Make sure project name isn't selectable on touch devices (iPads)
-      function applyTouchSelectLock() {
-        const isTouch = (('ontouchstart' in window) || navigator.maxTouchPoints > 0);
-        if (isTouch) {
-          const pn = document.getElementById('projectName');
-          if (pn) pn.style.userSelect = 'none';
-      // Project name blur behavior: when tapping outside the editable title, remove focus and selection
-      (function addProjectNameBlurHandler(){
-        const pn = document.getElementById('projectName');
-        function isInsideProjectName(target){
-          return pn.contains(target) || target === pn;
+      <button class="plain-tool" id="tool-erase" title="Erase" aria-label="Erase">
+        <img src="https://www.svgrepo.com/show/412952/erase.svg" alt="erase">
+      </button>
+
+      <button class="plain-tool" id="tool-layers" title="Layers" aria-label="Layers">
+        <img src="https://www.svgrepo.com/show/479246/layer.svg" alt="layers">
+      </button>
+
+      <div id="tool-color" class="color-circle" title="Color" aria-label="Color" style="background:var(--accent)"></div>
+    </div>
+  </div>
+
+  <!-- Rest of the controls left intact -->
+  <div style="width:100%;height:8px"></div>
+
+  <div class="control-group">
+    <button class="btn" onclick="document.getElementById('songInput').click()">📁 Load Song (MIDI/MP3)</button>
+    <input type="file" id="songInput" accept=".mid,.midi,.mp3,.wav">
+  </div>
+
+  <div class="control-group">
+    <label for="tempoInput">Tempo (BPM):</label>
+    <input type="number" id="tempoInput" value="175" min="65" max="240">
+  </div>
+
+  <div class="control-group">
+    <label for="defaultOctave">Default Octave:</label>
+    <input type="number" id="defaultOctave" value="4" min="0" max="7">
+  </div>
+
+  <div class="control-group">
+    <button id="addLayerBtn" class="btn" style="background:#ffe66d; color:#231438;">+ Add Layer</button>
+    <button id="playBtn" class="btn">▶ Preview Audio</button>
+  </div>
+</div>
+
+<div class="tracks-container" id="tracksContainer"></div>
+
+<div class="modal-overlay" id="inspectorModal">
+  <div class="modal-card">
+    <h3 class="modal-title" id="modalTitle">Edit Note</h3>
+    
+    <div class="modal-row">
+      <label for="editOctave">Octave (0-7):</label>
+      <input type="number" id="editOctave" min="0" max="7" value="4">
+    </div>
+
+    <div class="modal-row">
+      <label for="editDuration">Length (Blocks):</label>
+      <input type="number" id="editDuration" min="1" max="64" value="1">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="deleteNoteBtn">🗑 Delete</button>
+      <button class="btn" id="saveNoteBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Preserve rest of original app logic below unchanged (MIDI processing, rendering, Tone.js usage)
+  let parsedMidi = null;
+  let processedLayers = [];
+  let layerDrawFunctions = [];
+  let isSyncingScroll = false;
+  let layerSamplers = {};
+  let layerFallbackSynths = {};
+  let activeEditingNote = null;
+  let activeEditingLayerIdx = null;
+  let playheadX = -1;
+
+  const NOTE_CONFIG = [
+    { name: 'B',  color: '#ff1493' },
+    { name: 'A#', color: '#8a2be2' },
+    { name: 'A',  color: '#0033cc' },
+    { name: 'G#', color: '#0074d9' },
+    { name: 'G',  color: '#00f3ff' },
+    { name: 'F#', color: '#008080' },
+    { name: 'F',  color: '#00ff00' },
+    { name: 'E',  color: '#32cd32' },
+    { name: 'D#', color: '#ffd700' },
+    { name: 'D',  color: '#ff7f00' },
+    { name: 'C#', color: '#ff4500' },
+    { name: 'C',  color: '#ff0000' }
+  ];
+
+  const AJ_INSTRUMENTS = [
+    "Grand Piano", "Simple Piano", "Bass", "Chip Synth", 
+    "Chirping Bells", "Gritty Brass", "Sunny Synth", "Harp", "Gentle Brass"
+  ];
+
+  const SAMPLE_PREFIXES = {
+    "Grand Piano": "grandpiano",
+    "Simple Piano": "simplepiano",
+    "Bass": "bass",
+    "Chip Synth": "chipsynth",
+    "Chirping Bells": "chirpingbells",
+    "Gritty Brass": "grittybrass",
+    "Sunny Synth": "sunnysynth",
+    "Harp": "harp",
+    "Gentle Brass": "gentlebrass"
+  };
+
+  const INSTRUMENT_VOLUMES = {
+    "Grand Piano": 0,
+    "Simple Piano": -1,
+    "Bass": -3,
+    "Chip Synth": -7,
+    "Chirping Bells": +2,
+    "Gritty Brass": -6,
+    "Sunny Synth": -5,
+    "Harp": +4,
+    "Gentle Brass": -2
+  };
+
+  const ROW_HEIGHT = 16;
+  const COL_WIDTH = 28;
+
+  function getMaxColumns() {
+    let bpm = parseInt(document.getElementById('tempoInput').value) || 175;
+    bpm = Math.max(65, Math.min(240, bpm));
+    return Math.floor((300 * bpm) / 15);
+  }
+
+  function getVelocityForOctave(octave) {
+    const oct = Math.max(0, Math.min(7, octave));
+    const octaveVelocityMap = {
+      0: 0.25, 1: 0.35, 2: 0.50, 3: 0.70,
+      4: 0.85, 5: 0.95, 6: 1.00, 7: 1.00
+    };
+    return octaveVelocityMap[oct] || 0.8;
+  }
+
+  function getFallbackSynthForLayer(layerIdx, instrumentName) {
+    if (!layerFallbackSynths[layerIdx]) {
+      const volDb = INSTRUMENT_VOLUMES[instrumentName] || 0;
+      layerFallbackSynths[layerIdx] = new Tone.PolySynth(Tone.Synth, {
+        volume: volDb,
+        envelope: { attack: 0.01, decay: 0.3, sustain: 0.8, release: 1.2 }
+      }).toDestination();
+    } else {
+      layerFallbackSynths[layerIdx].volume.value = INSTRUMENT_VOLUMES[instrumentName] || 0;
+    }
+    return layerFallbackSynths[layerIdx];
+  }
+
+  function getSamplerForLayer(layerIdx, instrumentName) {
+    const prefix = SAMPLE_PREFIXES[instrumentName] || "grandpiano";
+    const key = `${layerIdx}_${prefix}`;
+
+    if (!layerSamplers[key]) {
+      const volDb = INSTRUMENT_VOLUMES[instrumentName] || 0;
+      layerSamplers[key] = new Tone.Sampler({
+        urls: { C2: `${prefix}_c2.mp3`, C4: `${prefix}_c4.mp3`, C6: `${prefix}_c6.mp3` },
+        baseUrl: "./",
+        volume: volDb,
+        release: 1.2
+      }).toDestination();
+    }
+    return layerSamplers[key];
+  }
+
+  async function playNoteSample(layerIdx, instrumentName, fullNote, octave) {
+    await Tone.start();
+    const velocity = getVelocityForOctave(octave);
+    const sampler = getSamplerForLayer(layerIdx, instrumentName);
+
+    if (sampler && sampler.loaded) {
+      sampler.triggerAttackRelease(fullNote, "4n", undefined, velocity);
+    } else {
+      getFallbackSynthForLayer(layerIdx, instrumentName).triggerAttackRelease(fullNote, "4n", undefined, velocity);
+    }
+  }
+
+  function redrawAll() {
+    layerDrawFunctions.forEach(fn => fn());
+  }
+
+  document.getElementById('tempoInput').addEventListener('change', () => {
+    if (parsedMidi) processAndRender();
+    else renderStackedGrids();
+  });
+
+  document.getElementById('addLayerBtn').addEventListener('click', () => {
+    if (processedLayers.length >= 11) {
+      alert("Maximum 11 layers allowed!");
+      return;
+    }
+    processedLayers.push({
+      id: processedLayers.length + 1,
+      instrument: "Grand Piano",
+      notes: []
+    });
+    renderStackedGrids();
+  });
+
+  document.getElementById('songInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const fileName = file.name.toLowerCase();
+
+    if (fileName.endsWith('.mid') || fileName.endsWith('.midi')) {
+      const arrayBuffer = await file.arrayBuffer();
+      parsedMidi = new Midi(arrayBuffer);
+      processAndRender();
+    } else if (fileName.endsWith('.mp3') || fileName.endsWith('.wav')) {
+      processFilteredMp3Audio(file);
+    }
+  });
+
+  // MP3 Audio Transcriber with Low-Pass Filtering & Overtone Suppression
+  async function processFilteredMp3Audio(file) {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await file.arrayBuffer();
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+    const bpm = parseInt(document.getElementById('tempoInput').value) || 175;
+    const secPerCol = 15 / bpm;
+    const maxCols = getMaxColumns();
+
+    const channelData = audioBuffer.getChannelData(0);
+    const sampleRate = audioBuffer.sampleRate;
+    
+    processedLayers = [{ id: 1, instrument: "Grand Piano", notes: [] }];
+
+    const bufferSize = 2048;
+    let rawDetectedPitches = [];
+
+    for (let col = 0; col < maxCols; col++) {
+      const startTime = col * secPerCol;
+      const startSample = Math.floor(startTime * sampleRate);
+
+      if (startSample >= channelData.length) break;
+
+      const chunk = channelData.subarray(startSample, startSample + bufferSize);
+      const pitchHz = filteredAutoCorrelate(chunk, sampleRate);
+
+      if (pitchHz > 0) {
+        let midiNum = Math.round(69 + 12 * Math.log2(pitchHz / 440));
+        
+        // Cap note octaves between 2 and 5 to stop extreme high screeching
+        let octave = Math.floor(midiNum / 12) - 1;
+        if (octave > 5) octave = 5;
+        if (octave < 2) octave = 2;
+
+        const pitchIdx = midiNum % 12;
+        const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        const pitchName = noteNames[pitchIdx];
+        const rowIdx = NOTE_CONFIG.findIndex(c => c.name === pitchName);
+
+        if (rowIdx !== -1) {
+          rawDetectedPitches.push({ col, rowIdx, pitchName, octave });
         }
       }
-      applyTouchSelectLock();
+    }
 
-      // Ensure elements have the requested names/data attributes (already set in markup)
-        document.addEventListener('pointerdown', (e) => {
-          // allow editing when touching the project name itself
-          if (isInsideProjectName(e.target)) return;
+    // Connect consecutive matching pitch hits into clean sustained notes
+    let currentNote = null;
+    rawDetectedPitches.forEach(p => {
+      if (currentNote && currentNote.rowIdx === p.rowIdx && currentNote.octave === p.octave && p.col === currentNote.startCol + currentNote.colDuration) {
+        currentNote.colDuration += 1;
+      } else {
+        if (currentNote) processedLayers[0].notes.push(currentNote);
+        currentNote = {
+          pitch: p.pitchName,
+          octave: p.octave,
+          fullNote: `${p.pitchName}${p.octave}`,
+          startCol: p.col,
+          colDuration: 1,
+          rowIdx: p.rowIdx,
+          x: p.col * COL_WIDTH,
+          y: p.rowIdx * ROW_HEIGHT,
+          w: COL_WIDTH,
+          h: ROW_HEIGHT,
+          color: NOTE_CONFIG[p.rowIdx].color
+        };
+      }
+    });
+    if (currentNote) processedLayers[0].notes.push(currentNote);
 
-          // if project name is focused, blur it and clear selection
-          if (document.activeElement === pn) {
-            pn.blur();
-            const sel = window.getSelection && window.getSelection();
-            if (sel && sel.removeAllRanges) sel.removeAllRanges();
+    renderStackedGrids();
+  }
+
+  // Pitch correlation with audio energy thresholding
+  function filteredAutoCorrelate(buf, sampleRate) {
+    let SIZE = buf.length;
+    let rms = 0;
+
+    for (let i = 0; i < SIZE; i++) {
+      let val = buf[i];
+      rms += val * val;
+    }
+    rms = Math.sqrt(rms / SIZE);
+
+    // Ignore silence or low acoustic background noise
+    if (rms < 0.045) return -1;
+
+    let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+    for (let i = 0; i < SIZE / 2; i++) {
+      if (Math.abs(buf[i]) < thres) { r1 = i; break; }
+    }
+    for (let i = 1; i < SIZE / 2; i++) {
+      if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
+    }
+
+    buf = buf.slice(r1, r2);
+    SIZE = buf.length;
+
+    let c = new Array(SIZE).fill(0);
+    for (let i = 0; i < SIZE; i++) {
+      for (let j = 0; j < SIZE - i; j++) {
+        c[i] = c[i] + buf[j] * buf[j + i];
+      }
+    }
+
+    let d = 0;
+    while (c[d] > c[d + 1]) d++;
+    let maxval = -1, maxpos = -1;
+    for (let i = d; i < SIZE; i++) {
+      if (c[i] > maxval) {
+        maxval = c[i];
+        maxpos = i;
+      }
+    }
+    let T0 = maxpos;
+    return sampleRate / T0;
+  }
+
+  function processAndRender() {
+    if (!parsedMidi) return;
+
+    const bpm = parseInt(document.getElementById('tempoInput').value) || 175;
+    const secPerCol = 15 / bpm;
+    const maxCols = getMaxColumns();
+
+    processedLayers = [];
+
+    function addNoteToLayers(note) {
+      if (note.time > 300) return;
+
+      const startCol = Math.floor(note.time / secPerCol);
+      const colDuration = Math.max(1, Math.round(note.duration / secPerCol));
+      if (startCol >= maxCols) return;
+
+      const pitchName = note.pitch;
+      const rowIdx = NOTE_CONFIG.findIndex(c => c.name === pitchName);
+      if (rowIdx === -1) return;
+
+      let targetLayer = processedLayers.find(layer => {
+        return !layer.notes.some(n => 
+          n.rowIdx === rowIdx && 
+          !(startCol + colDuration <= n.startCol || startCol >= n.startCol + n.colDuration)
+        );
+      });
+
+      if (!targetLayer) {
+        if (processedLayers.length >= 11) return;
+        targetLayer = {
+          id: processedLayers.length + 1,
+          instrument: "Grand Piano", // Keeps default as Grand Piano
+          notes: []
+        };
+        processedLayers.push(targetLayer);
+      }
+
+      targetLayer.notes.push({
+        pitch: pitchName,
+        octave: note.octave,
+        fullNote: note.name,
+        startCol: startCol,
+        colDuration: colDuration,
+        rowIdx: rowIdx,
+        x: startCol * COL_WIDTH,
+        y: rowIdx * ROW_HEIGHT,
+        w: Math.min(colDuration * COL_WIDTH, (maxCols - startCol) * COL_WIDTH),
+        h: ROW_HEIGHT,
+        color: NOTE_CONFIG[rowIdx].color
+      });
+    }
+
+    parsedMidi.tracks.forEach((track) => {
+      track.notes.forEach(note => addNoteToLayers(note));
+    });
+
+    renderStackedGrids();
+  }
+
+  function renderStackedGrids() {
+    const maxCols = getMaxColumns();
+    const container = document.getElementById('tracksContainer');
+    container.innerHTML = '';
+    const scrollContainers = [];
+    layerDrawFunctions = [];
+
+    if (processedLayers.length === 0) {
+      processedLayers.push({ id: 1, instrument: "Grand Piano", notes: [] });
+    }
+
+    processedLayers.forEach((layer, layerIdx) => {
+      const card = document.createElement('div');
+      card.className = 'track-card';
+
+      const header = document.createElement('div');
+      header.className = 'track-header';
+
+      const labelGroup = document.createElement('div');
+      labelGroup.style.display = 'flex';
+      labelGroup.style.alignItems = 'center';
+      labelGroup.style.gap = '10px';
+
+      const titleSpan = document.createElement('span');
+      titleSpan.innerText = `Layer ${layerIdx + 1}:`;
+
+      const select = document.createElement('select');
+      select.className = 'instrument-select';
+      AJ_INSTRUMENTS.forEach(inst => {
+        const opt = document.createElement('option');
+        opt.value = inst;
+        opt.innerText = inst;
+        if (inst === layer.instrument) opt.selected = true;
+        select.appendChild(opt);
+      });
+
+      select.addEventListener('change', (e) => {
+        layer.instrument = e.target.value;
+        getSamplerForLayer(layerIdx, layer.instrument);
+      });
+
+      labelGroup.appendChild(titleSpan);
+      labelGroup.appendChild(select);
+
+      const countSpan = document.createElement('span');
+      countSpan.innerText = `${layer.notes.length} Notes`;
+
+      header.appendChild(labelGroup);
+      header.appendChild(countSpan);
+      card.appendChild(header);
+
+      const gridWrapper = document.createElement('div');
+      gridWrapper.className = 'grid-wrapper';
+
+      const pitchLabels = document.createElement('div');
+      pitchLabels.className = 'pitch-labels';
+      NOTE_CONFIG.forEach(cfg => {
+        const lbl = document.createElement('div');
+        lbl.className = 'pitch-label';
+        lbl.style.backgroundColor = cfg.color;
+        lbl.innerText = cfg.name;
+        pitchLabels.appendChild(lbl);
+      });
+      gridWrapper.appendChild(pitchLabels);
+
+      const canvasContainer = document.createElement('div');
+      canvasContainer.className = 'canvas-container';
+      scrollContainers.push(canvasContainer);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = maxCols * COL_WIDTH;
+      canvas.height = 12 * ROW_HEIGHT;
+      const ctx = canvas.getContext('2d');
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let col = 0; col < maxCols; col++) {
+          for (let row = 0; row < 12; row++) {
+            const isDark = (col + row) % 2 === 0;
+            ctx.fillStyle = isDark ? '#1a0e2e' : '#23133d';
+            ctx.fillRect(col * COL_WIDTH, row * ROW_HEIGHT, COL_WIDTH, ROW_HEIGHT);
           }
-        }, {capture:true});
+        }
 
-        // also handle touchend to ensure virtual keyboard hides on some iPads
-        document.addEventListener('touchend', (e) => {
-          if (!isInsideProjectName(e.target) && document.activeElement === pn) {
-            pn.blur();
-            const sel = window.getSelection && window.getSelection();
-            if (sel && sel.removeAllRanges) sel.removeAllRanges();
-          }
-        }, {passive:true});
-      })();
+        layer.notes.forEach(b => {
+          b.x = b.startCol * COL_WIDTH;
+          b.w = b.colDuration * COL_WIDTH;
 
-      // Simple color picker behavior for the color circle (keeps everything minimal)
-      (function colorControl(){
-        const colorEl = document.getElementById('tool-color');
-        let selected = getComputedStyle(document.documentElement).getPropertyValue('--selected-color') || '#f5d2a8';
-        selected = selected.trim();
-        function update(){ colorEl.style.background = selected; }
-        update();
+          ctx.fillStyle = b.color;
+          ctx.fillRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
 
-        colorEl.addEventListener('pointerdown', (e)=>{
-          // open a tiny color prompt (simple fallback) - touch-first
-          e.preventDefault();
-          const c = prompt('Enter hex color for brush', selected) || selected;
-          selected = c;
-          document.documentElement.style.setProperty('--selected-color', selected);
-          update();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 10px sans-serif';
+          ctx.fillText(b.octave, b.x + 4, b.y + 12);
         });
-      })();
 
-      // Paint selected by default: ensure selected class is present
-      (function ensureDefaultTool(){
-        const paint = document.getElementById('tool-paint');
-        if (paint && !paint.classList.contains('selected')) paint.classList.add('selected');
-      })();
+        if (playheadX >= 0) {
+          ctx.fillStyle = '#ffe66d';
+          ctx.fillRect(playheadX, 0, 3, canvas.height);
+        }
 
-      // Persist project name to localStorage
-      (function projectNamePersistence(){
-        const pn = document.getElementById('projectName');
-        const saved = localStorage.getItem('pj_name');
-        if (saved) pn.innerText = saved;
-        pn.addEventListener('input', () => { try{ localStorage.setItem('pj_name', pn.innerText);}catch(e){} });
-      })();
+        countSpan.innerText = `${layer.notes.length} Notes`;
+      }
 
-    </script>
-  </body>
+      layerDrawFunctions.push(draw);
+      draw();
+
+      canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+
+        const col = Math.floor(clickX / COL_WIDTH);
+        const rowIdx = Math.floor(clickY / ROW_HEIGHT);
+
+        const existingNote = layer.notes.find(n => 
+          n.rowIdx === rowIdx && col >= n.startCol && col < (n.startCol + n.colDuration)
+        );
+
+        if (existingNote) {
+          activeEditingNote = existingNote;
+          activeEditingLayerIdx = layerIdx;
+          document.getElementById('modalTitle').innerText = `Edit Note: ${existingNote.pitch}`;
+          document.getElementById('editOctave').value = existingNote.octave;
+          document.getElementById('editDuration').value = existingNote.colDuration;
+          document.getElementById('inspectorModal').style.display = 'flex';
+        } else {
+          const placementOctave = parseInt(document.getElementById('defaultOctave').value) || 4;
+          const pitchName = NOTE_CONFIG[rowIdx].name;
+          const fullNote = `${pitchName}${placementOctave}`;
+
+          const newNote = {
+            pitch: pitchName,
+            octave: placementOctave,
+            fullNote: fullNote,
+            startCol: col,
+            colDuration: 1,
+            rowIdx: rowIdx,
+            x: col * COL_WIDTH,
+            y: rowIdx * ROW_HEIGHT,
+            w: COL_WIDTH,
+            h: ROW_HEIGHT,
+            color: NOTE_CONFIG[rowIdx].color
+          };
+
+          layer.notes.push(newNote);
+          draw();
+          playNoteSample(layerIdx, layer.instrument, fullNote, placementOctave);
+        }
+      });
+
+      canvasContainer.appendChild(canvas);
+      gridWrapper.appendChild(canvasContainer);
+      card.appendChild(gridWrapper);
+      container.appendChild(card);
+    });
+
+    scrollContainers.forEach(targetContainer => {
+      targetContainer.addEventListener('scroll', () => {
+        if (!isSyncingScroll) {
+          isSyncingScroll = true;
+          const scrollPos = targetContainer.scrollLeft;
+          scrollContainers.forEach(c => {
+            if (c !== targetContainer) c.scrollLeft = scrollPos;
+          });
+          isSyncingScroll = false;
+        }
+      });
+    });
+  }
+
+  // Modal Controls
+  document.getElementById('saveNoteBtn').addEventListener('click', () => {
+    if (activeEditingNote && activeEditingLayerIdx !== null) {
+      const newOct = parseInt(document.getElementById('editOctave').value) || 4;
+      const newDur = Math.max(1, parseInt(document.getElementById('editDuration').value) || 1);
+
+      activeEditingNote.octave = Math.max(0, Math.min(7, newOct));
+      activeEditingNote.colDuration = newDur;
+      activeEditingNote.fullNote = `${activeEditingNote.pitch}${activeEditingNote.octave}`;
+
+      const layer = processedLayers[activeEditingLayerIdx];
+      if (layer) playNoteSample(activeEditingLayerIdx, layer.instrument, activeEditingNote.fullNote, activeEditingNote.octave);
+      redrawAll();
+    }
+    document.getElementById('inspectorModal').style.display = 'none';
+  });
+
+  document.getElementById('deleteNoteBtn').addEventListener('click', () => {
+    if (activeEditingNote && activeEditingLayerIdx !== null) {
+      const layer = processedLayers[activeEditingLayerIdx];
+      if (layer) {
+        const idx = layer.notes.indexOf(activeEditingNote);
+        if (idx !== -1) {
+          layer.notes.splice(idx, 1);
+          redrawAll();
+        }
+      }
+    }
+    document.getElementById('inspectorModal').style.display = 'none';
+  });
+
+  // Playhead Animation
+  function updatePlayhead() {
+    if (Tone.Transport.state === "started") {
+      const bpm = parseInt(document.getElementById('tempoInput').value) || 175;
+      const secPerCol = 15 / bpm;
+      const currentSec = Tone.Transport.seconds;
+      const colPos = currentSec / secPerCol;
+
+      playheadX = colPos * COL_WIDTH;
+      redrawAll();
+
+      const containers = document.querySelectorAll('.canvas-container');
+      containers.forEach(c => {
+        if (playheadX > c.scrollLeft + c.clientWidth - 100) {
+          c.scrollLeft = playheadX - 100;
+        }
+      });
+
+      requestAnimationFrame(updatePlayhead);
+    } else {
+      playheadX = -1;
+      redrawAll();
+    }
+  }
+
+  // Audio Preview Handler
+  document.getElementById('playBtn').addEventListener('click', async () => {
+    const playBtn = document.getElementById('playBtn');
+
+    if (Tone.Transport.state === "started") {
+      Tone.Transport.stop();
+      playBtn.innerText = "▶ Preview Audio";
+      playheadX = -1;
+      redrawAll();
+      return;
+    }
+
+    await Tone.start();
+
+    processedLayers.forEach((l, idx) => getSamplerForLayer(idx, l.instrument));
+
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
+    Tone.Transport.position = 0;
+
+    const bpm = parseInt(document.getElementById('tempoInput').value) || 175;
+    Tone.Transport.bpm.value = bpm;
+    const secPerCol = 15 / bpm;
+
+    processedLayers.forEach((layer, layerIdx) => {
+      const sampler = getSamplerForLayer(layerIdx, layer.instrument);
+
+      layer.notes.forEach(note => {
+        const time = note.startCol * secPerCol;
+        const dur = note.colDuration * secPerCol;
+        const velocity = getVelocityForOctave(note.octave);
+
+        Tone.Transport.schedule((t) => {
+          if (sampler && sampler.loaded) {
+            sampler.triggerAttackRelease(note.fullNote, dur, t, velocity);
+          } else {
+            getFallbackSynthForLayer(layerIdx, layer.instrument).triggerAttackRelease(note.fullNote, dur, t, velocity);
+          }
+        }, time);
+      });
+    });
+
+    Tone.Transport.start();
+    playBtn.innerText = "⏹ Stop Preview";
+
+    updatePlayhead();
+  });
+
+  // Header behaviour: blur project title when clicking/tapping outside and clear selection
+  (function projectTitleBlur(){
+    const pn = document.getElementById('projectName');
+    function isInside(target){ return pn === target || pn.contains(target); }
+
+    document.addEventListener('pointerdown', (e)=>{
+      if (isInside(e.target)) return;
+      if (document.activeElement === pn) {
+        pn.blur();
+        const sel = window.getSelection && window.getSelection(); if (sel && sel.removeAllRanges) sel.removeAllRanges();
+      }
+    }, {capture:true});
+
+    document.addEventListener('touchend', (e)=>{
+      if (!isInside(e.target) && document.activeElement === pn) {
+        pn.blur();
+        const sel = window.getSelection && window.getSelection(); if (sel && sel.removeAllRanges) sel.removeAllRanges();
+      }
+    }, {passive:true});
+
+    // persist name
+    try{ const saved = localStorage.getItem('pj_name'); if (saved) pn.innerText = saved; }catch(e){}
+    pn.addEventListener('input', ()=>{ try{ localStorage.setItem('pj_name', pn.innerText);}catch(e){} });
+  })();
+
+  // Ensure SVG icons appear white even if source is black (filter applied via CSS on <img>)
+  // Done via CSS filter on img in .plain-tool
+
+  renderStackedGrids();
+</script>
+
+</body>
 </html>
