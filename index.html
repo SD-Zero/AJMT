@@ -1,249 +1,125 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Procreate - Mockup</title>
-    <style>
-      :root{
-        --bg:#000; /* pure black background */
-        --grid:#1A1A1A; /* darker grid lines (requested) */
-        --topbar: rgba(0,0,0,0.60); /* topbar: near-black, semi-transparent */
-        --circle:#1A1A1A; /* slightly lighter button background */
-        --icon:#bfbfbf; /* muted light gray icon */
-        --selected-color:#f5d2a8; /* default selected color */
-        --gap:12px;
-        --topbar-height:44px; /* slim bar */
-        --frame-radius:40px; /* default radius, recalculated by JS */
-      }
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Animal Jam Mastertrack Studio</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <style>
+    :root {
+      --bg-color: #231438;
+      --card-bg: #351f54;
+      --accent: #ffe66d;
+      --highlight: #4ecdc4;
+      --text-main: #f5efff;
+      --danger: #ff4757;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
 
-      /* Base layout - fixed viewport, no scrolling */
-      html,body{height:100%;margin:0;overflow:hidden;background:var(--bg)}
-      body{
-        /* small 16px grid on black */
-        background-image:
-          linear-gradient(to right, var(--grid) 1px, transparent 1px),
-          linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
-        background-size:16px 16px;
-        -webkit-font-smoothing:antialiased;
-        -moz-osx-font-smoothing:grayscale;
-        font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-        color: #fff;
-      }
+    /* --- Toolbar tweaks per request --- */
+    .topbar { position: relative; display:flex; align-items:center; gap:12px; padding:10px 18px; background: rgba(0,0,0,0.6); width:100%; box-sizing:border-box; }
 
-      /* Full viewport thin frame border with rounded corners (iPad feel) */
-      .device-frame{
-        position:fixed;left:0;right:0;top:0;bottom:0;
-        border:2px solid var(--grid);
-        border-radius:var(--frame-radius);
-        pointer-events:none; /* don't block touches */
-        box-sizing:border-box;
-      }
+    /* Spread left icons wider (updated to 28px gap) */
+    .icon-row{ display:flex; align-items:center; gap:28px; margin-left:34px }
 
-      /* Topbar: flush to the very top and full width, no curved topbar edges */
-      .topbar{
-        height:var(--topbar-height);
-        display:flex;align-items:center;gap:var(--gap);
-        padding:0 18px;
-        background:var(--topbar);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        position:fixed;left:0;right:0;top:0;box-sizing:border-box;
-        border-bottom:1px solid var(--grid); /* bottom border same as grid */
-      }
+    /* Right side should be spread out as much as left */
+    .topbar-right{ display:flex; align-items:center; gap:28px; margin-right:34px }
 
-      .topbar-left{display:flex;align-items:center;gap:12px}
+    /* Plain tool style (used for both left and right icons now) */
+    .plain-tool{ background:transparent; border:none; padding:6px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+    .plain-svg{ width:18px; height:18px; display:block; filter: invert(1) brightness(2); }
 
-      /* Gallery label (thin, small) - non-selectable */
-      .gallery-label{
-        color:#ffffff;
-        font-weight:300;
-        font-size:13px;
-        letter-spacing:0.01em;
-        -webkit-user-select:none; /* don't allow selection on touch devices */
-        user-select:none;
-      }
+    /* Color circle stays as before */
+    .color-circle{ width:28px; height:28px; border-radius:50%; border:2px solid #ffffff; box-sizing:border-box; }
 
-      /* Project name centered in the topbar - editable */
-      .project-name{
-        position:absolute;left:50%;transform:translateX(-50%);
-        font-size:14px;font-weight:400;color:#e9e9e9;pointer-events:auto;
-        -webkit-user-select:text; user-select:text; -webkit-touch-callout: none;
-      }
+    /* keep the rest of layout intact (minimal changes) */
+    .controls-card{ display:none }
+    .tracks-container{ display:none }
 
-      /* Buttons moved farther from gallery and slightly smaller */
-      .icon-row{display:flex;align-items:center;gap:28px;margin-left:34px}
-      .icon-circle{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--circle);border:none;cursor:default}
-      .icon-svg{width:14px;height:14px;fill:var(--icon)}
+    .project-name{ position:absolute; left:50%; transform:translateX(-50%); color:var(--accent); font-weight:600; }
 
-      .topbar-spacer{flex:1}
+  </style>
+</head>
+<body>
 
-      /* Right-side plain tool strip (no background buttons except the color circle) */
-      .topbar-right{display:flex;align-items:center;gap:18px;margin-right:8px}
-      .plain-tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px 4px;background:transparent;border:none;color:var(--icon);cursor:default}
-      .plain-tool .plain-svg{width:18px;height:18px;fill:var(--icon)}
-      .color-circle{width:28px;height:28px;border-radius:50%;background:var(--selected-color);border:2px solid var(--icon);box-sizing:border-box}
-      .plain-tool.selected::after{content:"";display:block;width:18px;height:2px;background:var(--icon);border-radius:2px;margin-top:4px}
+  <div class="topbar" role="banner" aria-label="Top Bar">
+    <div class="topbar-left" style="display:flex;align-items:center">
+      <div id="galleryLabel" class="gallery-label" style="color:var(--text-main);-webkit-user-select:none;user-select:none">Gallery</div>
 
-      /* Content area fixed and not scrollable */
-      main{position:fixed;left:0;right:0;top:var(--topbar-height);bottom:0;overflow:hidden}
-      .canvas-placeholder{height:100%;display:flex;align-items:center;justify-content:center;color:#8b8b8b}
+      <div class="icon-row" aria-hidden="false">
+        <!-- Wrench (now plain icon) -->
+        <button id="tool-actions" class="plain-tool" aria-label="Actions" title="Actions">
+          <img class="plain-svg" src="https://www.svgrepo.com/show/535743/wrench.svg" alt="wrench icon">
+        </button>
 
-      /* Make project name editable only; keep other UI non-selectable on touch devices */
-      .nonselectable { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+        <!-- Wand -->
+        <button id="tool-adjustments" class="plain-tool" aria-label="Adjustments" title="Adjustments">
+          <img class="plain-svg" src="https://www.svgrepo.com/show/435698/magic-wand.svg" alt="wand icon">
+        </button>
 
-    </style>
-  </head>
-  <body>
+        <!-- Selection -->
+        <button id="tool-selections" class="plain-tool" aria-label="Selections" title="Selections">
+          <img class="plain-svg" src="https://www.svgrepo.com/show/522273/selection.svg" alt="selection icon">
+        </button>
 
-    <div class="device-frame" aria-hidden="true"></div>
-
-    <div class="topbar" role="banner" aria-label="Top Bar">
-      <div class="topbar-left">
-        <div id="galleryLabel" class="gallery-label nonselectable" role="button" aria-label="Gallery">Gallery</div>
-
-        <div class="icon-row" aria-hidden="false">
-          <!-- Actions -->
-          <button id="tool-actions" class="icon-circle nonselectable" data-tool="Actions" title="Actions" aria-label="Actions">
-            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.5 14.8l-3.6-3.6a6.1 6.1 0 0 0 .2-1.2 6.1 6.1 0 0 0-6.1-6.1c-.4 0-.8.05-1.2.15L6.4 1.6 4.6 3.4l3.9 3.9c-.1.4-.15.8-.15 1.2 0 3 2.5 5.5 5.5 5.5.4 0 .8-.05 1.2-.15l3.9 3.9 1.8-1.8-3.1-3.1z"/></svg>
-          </button>
-
-          <!-- Adjustments -->
-          <button id="tool-adjustments" class="icon-circle nonselectable" data-tool="Adjustments" title="Adjustments" aria-label="Adjustments">
-            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 18.4L10.4 11 13 13.6 6.2 20.4 3.6 18.4zM19 7l1.2-1.2L21.4 7 20.2 8.2 19 7zm-4-1l.6-1.6.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></svg>
-          </button>
-
-          <!-- Selections -->
-          <button id="tool-selections" class="icon-circle nonselectable" data-tool="Selections" title="Selections" aria-label="Selections">
-            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6c2.2 0 3 1.7 5 1.7s2.8-1.7 5-1.7v2c-2.2 0-3 1.7-5 1.7s-2.8-1.7-5-1.7V6zM6 15c2.2 0 3-1.7 5-1.7s2.8 1.7 5 1.7v-2c-2.2 0-3-1.7-5-1.7s-2.8 1.7-5 1.7v2z"/></svg>
-          </button>
-
-          <!-- Transform -->
-          <button id="tool-transform" class="icon-circle nonselectable" data-tool="Transform" title="Transform" aria-label="Transform">
-            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l6 12 3-2 6 8-15-18z"/></svg>
-          </button>
-        </div>
+        <!-- Cursor -->
+        <button id="tool-transform" class="plain-tool" aria-label="Transform" title="Transform">
+          <img class="plain-svg" src="https://www.svgrepo.com/show/535338/cursor.svg" alt="cursor icon">
+        </button>
       </div>
-
-      <div class="topbar-spacer"></div>
-
-      <!-- right-side tools (right-to-left visual order: Color at far right) -->
-      <div class="topbar-right" aria-hidden="false">
-        <!-- Paint (selected by default) -->
-        <button id="tool-paint" class="plain-tool selected" data-tool="Paint" aria-label="Paint" title="Paint">
-          <svg class="plain-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21l3-1 7-7 4-4 2 2-4 4-7 7-1 3-4-4z"/></svg>
-        </button>
-
-        <!-- Smudge -->
-        <button id="tool-smudge" class="plain-tool" data-tool="Smudge" aria-label="Smudge" title="Smudge">
-          <svg class="plain-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c-1.1 0-2 .9-2 2 0 .6.3 1.1.7 1.5L4 13v6h6l7.5-7.5c.4.4.9.7 1.5.7 1.1 0 2-.9 2-2S20.1 6 19 6c-.6 0-1.1.3-1.5.7L14.5 3H12z"/></svg>
-        </button>
-
-        <!-- Erase -->
-        <button id="tool-erase" class="plain-tool" data-tool="Erase" aria-label="Erase" title="Erase">
-          <svg class="plain-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M16.24 3.56l4.2 4.2c.78.78.78 2.05 0 2.83l-8.48 8.49-6.36-6.36L9.86 3.56c.78-.78 2.05-.78 2.83 0l3.55 3.55 0 0z"/></svg>
-        </button>
-
-        <!-- Layers (icon only) -->
-        <button id="tool-layers" class="plain-tool" data-tool="Layers" aria-label="Layers" title="Layers">
-          <svg class="plain-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L1 7l11 5 9-4.09V17h2V7L12 2zM3 9.23V12l9 4 9-4V9.23L12 13 3 9.23z"/></svg>
-        </button>
-
-        <!-- Color circle (shows selected color) -->
-        <div id="tool-color" class="color-circle" role="button" aria-label="Color" title="Color"></div>
-      </div>
-
-      <!-- centered project name (editable) -->
-      <div class="project-name" id="projectName" contenteditable="true" role="textbox" aria-label="Project name">Unnamed Project</div>
-
     </div>
 
-    <main>
-      <div class="canvas-placeholder">Canvas area (to be added)</div>
-    </main>
+    <div style="flex:1"></div>
 
-    <script>
-      // Recalculate frame radius based on viewport to approximate iPad curvature
-      function updateFrameRadius() {
-        const minDim = Math.min(window.innerWidth, window.innerHeight);
-        // Use a percentage of the smaller dimension, clamp between 18 and 96
-        const radius = Math.min(96, Math.max(18, Math.round(minDim * 0.06)));
-        document.documentElement.style.setProperty('--frame-radius', radius + 'px');
+    <!-- Right-side tools (ordered left-to-right visually as requested right-to-left originally) -->
+    <div class="topbar-right" aria-hidden="false">
+      <!-- Paint brush (selected by default) -->
+      <button id="tool-paint" class="plain-tool" aria-label="Paint" title="Paint">
+        <img class="plain-svg" src="https://www.svgrepo.com/show/485640/brush.svg" alt="brush icon">
+      </button>
+
+      <!-- Smudge -> point-down icon -->
+      <button id="tool-smudge" class="plain-tool" aria-label="Smudge" title="Smudge">
+        <img class="plain-svg" src="https://www.svgrepo.com/show/535580/point-down.svg" alt="smudge icon">
+      </button>
+
+      <!-- Erase -->
+      <button id="tool-erase" class="plain-tool" aria-label="Erase" title="Erase">
+        <img class="plain-svg" src="https://www.svgrepo.com/show/412952/erase.svg" alt="erase icon">
+      </button>
+
+      <!-- Layers -->
+      <button id="tool-layers" class="plain-tool" aria-label="Layers" title="Layers">
+        <img class="plain-svg" src="https://www.svgrepo.com/show/479246/layer.svg" alt="layer icon">
+      </button>
+
+      <!-- Color circle -->
+      <div id="tool-color" class="color-circle" role="button" aria-label="Color" title="Color" style="background:var(--text-main)"></div>
+    </div>
+
+    <div class="project-name" id="projectName" contenteditable="true" role="textbox" aria-label="Project name">Animal Jam Mastertrack Studio</div>
+  </div>
+
+  <script>
+    // Ensure imgs load as white (some SVGs may include fills that are black; filter above in CSS inverts)
+    // Also make clicking outside project name blur it (existing behavior expected elsewhere)
+    document.addEventListener('pointerdown', (e)=>{
+      const pn = document.getElementById('projectName');
+      if (!pn.contains(e.target) && document.activeElement === pn){
+        pn.blur();
+        const sel = window.getSelection && window.getSelection(); if (sel && sel.removeAllRanges) sel.removeAllRanges();
       }
-      window.addEventListener('resize', updateFrameRadius);
-      updateFrameRadius();
-
-      // Spread out left icons: handled by CSS (.icon-row gap increased)
-
-      // Touch-first behavior: block mouse-only pointer interactions so UI is optimized for touch/pen.
-      function blockMousePointers(e) {
-        if (e.pointerType === 'mouse') e.preventDefault();
-      }
-      window.addEventListener('pointerdown', blockMousePointers, {capture:true});
-      window.addEventListener('pointermove', function(e){ if(e.pointerType==='mouse') e.preventDefault(); }, {capture:true});
-      window.addEventListener('pointerup', blockMousePointers, {capture:true});
-
-      // Project name blur behavior: when tapping outside the editable title, remove focus and selection
-      (function addProjectNameBlurHandler(){
-        const pn = document.getElementById('projectName');
-        function isInsideProjectName(target){
-          return pn.contains(target) || target === pn;
-        }
-
-        document.addEventListener('pointerdown', (e) => {
-          // allow editing when touching the project name itself
-          if (isInsideProjectName(e.target)) return;
-
-          // if project name is focused, blur it and clear selection
-          if (document.activeElement === pn) {
-            pn.blur();
-            const sel = window.getSelection && window.getSelection();
-            if (sel && sel.removeAllRanges) sel.removeAllRanges();
-          }
-        }, {capture:true});
-
-        // also handle touchend to ensure virtual keyboard hides on some iPads
-        document.addEventListener('touchend', (e) => {
-          if (!isInsideProjectName(e.target) && document.activeElement === pn) {
-            pn.blur();
-            const sel = window.getSelection && window.getSelection();
-            if (sel && sel.removeAllRanges) sel.removeAllRanges();
-          }
-        }, {passive:true});
-      })();
-
-      // Simple color picker behavior for the color circle (keeps everything minimal)
-      (function colorControl(){
-        const colorEl = document.getElementById('tool-color');
-        let selected = getComputedStyle(document.documentElement).getPropertyValue('--selected-color') || '#f5d2a8';
-        selected = selected.trim();
-        function update(){ colorEl.style.background = selected; }
-        update();
-
-        colorEl.addEventListener('pointerdown', (e)=>{
-          // open a tiny color prompt (simple fallback) - touch-first
-          e.preventDefault();
-          const c = prompt('Enter hex color for brush', selected) || selected;
-          selected = c;
-          document.documentElement.style.setProperty('--selected-color', selected);
-          update();
-        });
-      })();
-
-      // Paint selected by default: ensure selected class is present
-      (function ensureDefaultTool(){
-        const paint = document.getElementById('tool-paint');
-        if (paint && !paint.classList.contains('selected')) paint.classList.add('selected');
-      })();
-
-      // Persist project name to localStorage
-      (function projectNamePersistence(){
-        const pn = document.getElementById('projectName');
-        const saved = localStorage.getItem('pj_name');
-        if (saved) pn.innerText = saved;
-        pn.addEventListener('input', () => { try{ localStorage.setItem('pj_name', pn.innerText);}catch(e){} });
-      })();
-
-    </script>
-  </body>
+    }, {capture:true});
+  </script>
+</body>
 </html>
