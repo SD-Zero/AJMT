@@ -6,21 +6,20 @@
     <title>Procreate - Mockup</title>
     <style>
       :root{
-        --bg:#242424; /* requested background */
-        --grid:#2D2D2D; /* grid lines */
-        --topbar: rgba(24,24,24,0.78); /* topbar color (darker than background, lighter than buttons) */
-        --circle:#0d0d0d; /* very dark buttons */
+        --bg:#000; /* now pure black background */
+        --grid:#2D2D2D; /* grid lines dark gray */
+        --topbar: rgba(0,0,0,0.60); /* topbar: near-black, semi-transparent */
+        --circle:#0b0b0b; /* very dark buttons */
         --icon:#bfbfbf; /* muted light gray icon */
         --gap:12px;
         --topbar-height:44px; /* slim bar */
-        --frame-radius:40px; /* default radius, will be recalculated by JS */
+        --frame-radius:40px; /* default radius, recalculated by JS */
       }
 
-      /* Full window background with a small square grid using CSS gradients */
-      html,body{height:100%;margin:0;overflow:hidden}
+      /* Base layout - fixed viewport, no scrolling */
+      html,body{height:100%;margin:0;overflow:hidden;background:var(--bg)}
       body{
-        background-color:var(--bg);
-        /* small 16px grid */
+        /* small 16px grid on black */
         background-image:
           linear-gradient(to right, var(--grid) 1px, transparent 1px),
           linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
@@ -31,116 +30,101 @@
         color: #fff;
       }
 
-      /* Device frame: thin border around the whole viewport with rounded corners to match iPad curvature */
+      /* Full viewport thin frame border with rounded corners (iPad feel) */
       .device-frame{
-        position:fixed;
-        left:0;right:0;top:0;bottom:0;
+        position:fixed;left:0;right:0;top:0;bottom:0;
         border:2px solid var(--grid);
         border-radius:var(--frame-radius);
-        pointer-events:none; /* don't block clicks */
+        pointer-events:none; /* don't block touches */
         box-sizing:border-box;
       }
 
-      /* Topbar: flush to the very top, full width, no floating inset; slim and simple */
+      /* Topbar: flush to the very top and full width, no rounded edges on the bar itself */
       .topbar{
         height:var(--topbar-height);
-        display:flex;
-        align-items:center;
-        gap:var(--gap);
+        display:flex;align-items:center;gap:var(--gap);
         padding:0 18px;
         background:var(--topbar);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        position:fixed;
-        left:0;right:0;top:0;
-        box-sizing:border-box;
-        border-bottom:1px solid var(--grid); /* bottom line same color as grid */
-        border-top-left-radius:var(--frame-radius);
-        border-top-right-radius:var(--frame-radius);
-        overflow:hidden;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        position:fixed;left:0;right:0;top:0;box-sizing:border-box;
+        border-bottom:1px solid var(--grid); /* bottom border same as grid */
       }
-
-      /* Remove any floating appearance — topbar sits flush against the frame edges */
-      .topbar::before{content:'';display:block;height:0}
 
       .topbar-left{display:flex;align-items:center;gap:12px}
 
-      /* Gallery text: lighter weight and smaller */
+      /* Gallery label (thin, small) */
       .gallery-label{
         color:#ffffff;
-        font-weight:400;
+        font-weight:300;
         font-size:13px;
         letter-spacing:0.01em;
+        -webkit-user-select:none; /* don't allow selection on touch devices */
+        user-select:none;
       }
 
-      /* push the buttons farther away from Gallery by increasing left margin */
+      /* Project name centered in the topbar */
+      .project-name{
+        position:absolute;left:50%;transform:translateX(-50%);
+        font-size:14px;font-weight:400;color:#e9e9e9;pointer-events:none;
+      }
+
+      /* Buttons moved farther from gallery and slightly smaller */
       .icon-row{display:flex;align-items:center;gap:18px;margin-left:26px}
-
-      /* Slightly smaller circular buttons, flat */
-      .icon-circle{
-        width:32px;height:32px;border-radius:50%;display:grid;place-items:center;
-        background:var(--circle);
-        border:none;
-        cursor:pointer;
-        outline:none;
-      }
-
+      .icon-circle{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--circle);border:none;cursor:default}
       .icon-svg{width:14px;height:14px;fill:var(--icon)}
 
       .topbar-spacer{flex:1}
 
-      /* Keep the content area fixed and not scrollable */
+      /* Content area fixed and not scrollable */
       main{position:fixed;left:0;right:0;top:var(--topbar-height);bottom:0;overflow:hidden}
+      .canvas-placeholder{height:100%;display:flex;align-items:center;justify-content:center;color:#8b8b8b}
 
-      /* placeholder area for canvas */
-      .canvas-placeholder{height:100%;display:flex;align-items:center;justify-content:center;color:#bdbdbd}
+      /* Make project name and gallery non-selectable on touch devices */
+      @media (pointer:coarse) {
+        .project-name, .gallery-label { -webkit-user-select:none; user-select:none; }
+      }
 
-      /* accessibility focus state (subtle) */
-      .icon-circle:focus{outline:2px solid rgba(191,191,191,0.08)}
+      /* Disable mouse interactions while allowing touch/pen events */
+      /* Pointer handling in script below will block mouse pointer interactions */
 
     </style>
   </head>
   <body>
 
-    <!-- full-viewport frame; JS will calculate --frame-radius to better match device shape -->
     <div class="device-frame" aria-hidden="true"></div>
 
-    <div class="topbar" role="banner">
+    <div class="topbar" role="banner" aria-label="Top Bar">
       <div class="topbar-left">
-        <div class="gallery-label">Gallery</div>
+        <div id="galleryLabel" class="gallery-label" role="button" aria-label="Gallery">Gallery</div>
 
         <div class="icon-row" aria-hidden="false">
-          <!-- Wrench / settings icon -->
-          <button class="icon-circle" title="Wrench" aria-label="Wrench">
-            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M21.5 14.8l-3.6-3.6a6.1 6.1 0 0 0 .2-1.2 6.1 6.1 0 0 0-6.1-6.1c-.4 0-.8.05-1.2.15L6.4 1.6 4.6 3.4l3.9 3.9c-.1.4-.15.8-.15 1.2 0 3 2.5 5.5 5.5 5.5.4 0 .8-.05 1.2-.15l3.9 3.9 1.8-1.8-3.1-3.1z"/>
-            </svg>
+          <!-- Actions (was wrench) -->
+          <button id="tool-actions" class="icon-circle" data-tool="Actions" title="Actions" aria-label="Actions">
+            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.5 14.8l-3.6-3.6a6.1 6.1 0 0 0 .2-1.2 6.1 6.1 0 0 0-6.1-6.1c-.4 0-.8.05-1.2.15L6.4 1.6 4.6 3.4l3.9 3.9c-.1.4-.15.8-.15 1.2 0 3 2.5 5.5 5.5 5.5.4 0 .8-.05 1.2-.15l3.9 3.9 1.8-1.8-3.1-3.1z"/></svg>
           </button>
 
-          <!-- Magic wand icon -->
-          <button class="icon-circle" title="Magic Wand" aria-label="Magic Wand">
-            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3.6 18.4L10.4 11 13 13.6 6.2 20.4 3.6 18.4zM19 7l1.2-1.2L21.4 7 20.2 8.2 19 7zm-4-1l.6-1.6.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/>
-            </svg>
+          <!-- Adjustments (was wand) -->
+          <button id="tool-adjustments" class="icon-circle" data-tool="Adjustments" title="Adjustments" aria-label="Adjustments">
+            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 18.4L10.4 11 13 13.6 6.2 20.4 3.6 18.4zM19 7l1.2-1.2L21.4 7 20.2 8.2 19 7zm-4-1l.6-1.6.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></svg>
           </button>
 
-          <!-- S-shaped ribbon icon -->
-          <button class="icon-circle" title="Ribbon" aria-label="Ribbon">
-            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6 6c2.2 0 3 1.7 5 1.7s2.8-1.7 5-1.7v2c-2.2 0-3 1.7-5 1.7s-2.8-1.7-5-1.7V6zM6 15c2.2 0 3-1.7 5-1.7s2.8 1.7 5 1.7v-2c-2.2 0-3-1.7-5-1.7s-2.8 1.7-5 1.7v2z"/>
-            </svg>
+          <!-- Selections (was ribbon) -->
+          <button id="tool-selections" class="icon-circle" data-tool="Selections" title="Selections" aria-label="Selections">
+            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6c2.2 0 3 1.7 5 1.7s2.8-1.7 5-1.7v2c-2.2 0-3 1.7-5 1.7s-2.8-1.7-5-1.7V6zM6 15c2.2 0 3-1.7 5-1.7s2.8 1.7 5 1.7v-2c-2.2 0-3-1.7-5-1.7s-2.8 1.7-5 1.7v2z"/></svg>
           </button>
 
-          <!-- Mouse cursor icon -->
-          <button class="icon-circle" title="Cursor" aria-label="Cursor">
-            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3 3l6 12 3-2 6 8-15-18z"/>
-            </svg>
+          <!-- Transform (was cursor) -->
+          <button id="tool-transform" class="icon-circle" data-tool="Transform" title="Transform" aria-label="Transform">
+            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l6 12 3-2 6 8-15-18z"/></svg>
           </button>
         </div>
       </div>
 
       <div class="topbar-spacer"></div>
+
+      <!-- centered project name -->
+      <div class="project-name" id="projectName">Unnamed Project</div>
 
       <div aria-hidden="true" style="opacity:0.6;font-size:13px;padding-right:18px">&nbsp;</div>
     </div>
@@ -150,18 +134,36 @@
     </main>
 
     <script>
-      // Calculate frame radius dynamically from viewport to better match device curvature on iPad-sized screens
+      // Recalculate frame radius based on viewport to approximate iPad curvature
       function updateFrameRadius() {
         const minDim = Math.min(window.innerWidth, window.innerHeight);
-        // Use a percentage of the smaller dimension; tweak factor as needed
-        const radius = Math.max(18, Math.round(minDim * 0.05));
+        // Use a percentage of the smaller dimension, clamp between 18 and 96
+        const radius = Math.min(96, Math.max(18, Math.round(minDim * 0.06)));
         document.documentElement.style.setProperty('--frame-radius', radius + 'px');
       }
       window.addEventListener('resize', updateFrameRadius);
       updateFrameRadius();
 
-      // Ensure topbar is not inset or floating — keep it flush
-      // No-op: CSS positions topbar at the very top; script left intentionally minimal
+      // Block mouse-only pointer interactions so the UI is touch-first.
+      // This allows touch & pen while preventing mouse clicks/drags.
+      function blockMousePointers(e) {
+        if (e.pointerType === 'mouse') e.preventDefault();
+      }
+      window.addEventListener('pointerdown', blockMousePointers, {capture:true});
+      window.addEventListener('pointermove', function(e){ if(e.pointerType==='mouse') e.preventDefault(); }, {capture:true});
+      window.addEventListener('pointerup', blockMousePointers, {capture:true});
+
+      // Make sure project name isn't selectable on touch devices (iPads)
+      function applyTouchSelectLock() {
+        const isTouch = (('ontouchstart' in window) || navigator.maxTouchPoints > 0);
+        if (isTouch) {
+          const pn = document.getElementById('projectName');
+          if (pn) pn.style.userSelect = 'none';
+        }
+      }
+      applyTouchSelectLock();
+
+      // Ensure elements have the requested names/data attributes (already set in markup)
     </script>
   </body>
 </html>
